@@ -9,9 +9,9 @@ export function Facilities() {
     <section className="section-py">
       <Container>
         <SectionTitle
-          eyebrow="The Experience"
-          title="World-Class Facilities"
-          description="Every detail engineered for performance, recovery, and comfort."
+          eyebrow="What We Offer"
+          title="Facilities & Services"
+          description="Everything you need to train, transform, and thrive — all under one roof."
         />
 
         <StaggerGroup className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">

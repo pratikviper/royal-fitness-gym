@@ -1,58 +1,82 @@
 import type { Facility, StatItem } from "@/types";
 import {
   Dumbbell,
-  HeartPulse,
-  Waves,
-  Users,
-  Flame,
-  ShieldCheck,
+  UserRound,
   BadgeCheck,
+  ClipboardList,
+  Salad,
+  Lock,
+  Music2,
+  Flame,
+  TrendingDown,
+  Users,
   Trophy,
   Target,
 } from "lucide-react";
 
 export const facilities: Facility[] = [
   {
-    id: "strength",
-    title: "Strength Floor",
+    id: "unisex-gym",
+    title: "Unisex Gym",
     description:
-      "Competition-grade racks, platforms and free weights across a 6,000 sq ft floor.",
+      "A fully-equipped unisex training floor with modern strength and cardio equipment.",
     icon: Dumbbell,
   },
   {
-    id: "cardio",
-    title: "Cardio Theatre",
+    id: "personal-training",
+    title: "Personal Training",
     description:
-      "Latest smart cardio with immersive screens and heart-rate tracking.",
-    icon: HeartPulse,
+      "One-on-one coaching tailored to your body, schedule, and goals.",
+    icon: UserRound,
   },
   {
-    id: "recovery",
-    title: "Recovery & Spa",
+    id: "certified-trainers",
+    title: "Certified Trainers",
     description:
-      "Sauna, steam, ice baths and massage to keep you performing at your peak.",
-    icon: Waves,
+      "Train under experienced, certified fitness professionals who get results.",
+    icon: BadgeCheck,
   },
   {
-    id: "classes",
-    title: "Studio Classes",
+    id: "workout-plan",
+    title: "Custom Workout Plans",
     description:
-      "Boutique studios for HIIT, spin, yoga and boxing led by expert coaches.",
-    icon: Users,
+      "Structured programs built around your fitness level and targets.",
+    icon: ClipboardList,
   },
   {
-    id: "hiit",
-    title: "Functional Zone",
+    id: "nutrition-diet",
+    title: "Nutrition & Diet",
     description:
-      "Sleds, rigs, turf and rope for athletic, functional conditioning.",
+      "Personalized diet and nutrition guidance to fuel your transformation.",
+    icon: Salad,
+  },
+  {
+    id: "locker",
+    title: "Locker Rooms",
+    description:
+      "Clean, secure lockers and changing facilities for a hassle-free session.",
+    icon: Lock,
+  },
+  {
+    id: "zumba",
+    title: "Zumba",
+    description:
+      "High-energy Zumba classes that make cardio genuinely fun.",
+    icon: Music2,
+  },
+  {
+    id: "crossfit-abs",
+    title: "CrossFit & Abs",
+    description:
+      "Functional CrossFit and core-focused training to build real strength.",
     icon: Flame,
   },
   {
-    id: "coaching",
-    title: "Elite Coaching",
+    id: "fat-loss",
+    title: "Fat Loss Programs",
     description:
-      "Certified coaches, InBody analysis and data-driven programming.",
-    icon: ShieldCheck,
+      "Targeted fat-loss programs designed to reshape your physique.",
+    icon: TrendingDown,
   },
 ];
 
