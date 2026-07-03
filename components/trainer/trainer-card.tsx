@@ -12,7 +12,6 @@ import {
 import type { Trainer } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 const socialIcons: Record<string, LucideIcon> = {
   instagram: Instagram,
@@ -21,22 +20,15 @@ const socialIcons: Record<string, LucideIcon> = {
   linkedin: Linkedin,
 };
 
-const tierBadge: Record<Trainer["category"], string> = {
-  Silver: "bg-silver-gradient text-ink",
-  Gold: "bg-gradient-to-r from-amber-300 to-yellow-600 text-ink",
-  Platinum: "bg-gradient-to-r from-slate-200 to-slate-400 text-ink",
-  Diamond: "bg-royal-gradient text-white",
-};
-
-/** Reusable trainer card: image, name, category, experience, specialization,
+/** Reusable trainer card: image, name, role, experience, specialization,
  * socials and a booking CTA. Image reveals + lifts on hover. */
 export function TrainerCard({ trainer }: { trainer: Trainer }) {
   return (
     <motion.article
       layout
       initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.5 }}
       className="group relative overflow-hidden rounded-2xl border border-white/10 bg-card"
     >
@@ -46,18 +38,13 @@ export function TrainerCard({ trainer }: { trainer: Trainer }) {
           src={trainer.image}
           alt={trainer.name}
           fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/20 to-transparent" />
 
-        <span
-          className={cn(
-            "absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest",
-            tierBadge[trainer.category],
-          )}
-        >
-          {trainer.category}
+        <span className="absolute left-4 top-4 rounded-full bg-royal-gradient px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
+          {trainer.role}
         </span>
 
         {/* Socials — slide up on hover */}
@@ -90,7 +77,7 @@ export function TrainerCard({ trainer }: { trainer: Trainer }) {
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{trainer.experience} experience</span>
-          <Badge variant="ghost">{trainer.category} Coach</Badge>
+          <Badge variant="ghost">{trainer.role}</Badge>
         </div>
 
         <Button variant="outline" size="sm" className="w-full" asChild>

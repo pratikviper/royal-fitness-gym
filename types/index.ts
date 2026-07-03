@@ -1,28 +1,31 @@
 import type { LucideIcon } from "lucide-react";
 
-/** Shared tier used by membership plans and trainer categories. */
-export type Tier = "Silver" | "Gold" | "Platinum" | "Diamond";
-
 export interface NavItem {
   label: string;
   href: string;
 }
 
+/** A single duration/price option within a membership package. */
+export interface MembershipDuration {
+  label: string; // e.g. "3 Months"
+  months: number;
+  price: number; // INR
+}
+
 export interface MembershipPlan {
   id: string;
-  tier: Tier;
-  price: number;
-  period: string;
+  name: string; // e.g. "Weight Training"
   tagline: string;
+  durations: MembershipDuration[];
   features: string[];
   featured?: boolean;
-  accent: string; // tailwind gradient / hsl string for the tier
+  accent: string; // hsl string used for the card accent
 }
 
 export interface Trainer {
   id: string;
   name: string;
-  category: Tier;
+  role: string; // e.g. "Personal Trainer" / "Head Coach"
   experience: string;
   specialization: string;
   image: string;

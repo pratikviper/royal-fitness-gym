@@ -9,8 +9,8 @@ export function MembershipPreview() {
       <Container className="relative">
         <SectionTitle
           eyebrow="Membership"
-          title="Choose Your Tier"
-          description="From Silver to Diamond — flexible plans crafted for every level of ambition. Cancel anytime."
+          title="Choose Your Package"
+          description="Weight Training, Cardio, or the complete All In One experience — flexible 3, 6, and 12-month plans for every goal."
         />
         <div className="mt-14">
           <PricingGrid />

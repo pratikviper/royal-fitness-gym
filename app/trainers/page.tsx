@@ -18,7 +18,7 @@ export default function TrainersPage() {
       <PageHeader
         eyebrow="The Team"
         title="Meet Your Coaches"
-        description="Filter by tier to find the specialist who matches your goals. Every coach is certified, experienced, and results-obsessed."
+        description="Our certified personal trainers specialize in strength, cardio, functional training and more — ready to guide your transformation."
       />
 
       <section className="pb-8">

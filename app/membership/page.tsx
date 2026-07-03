@@ -15,22 +15,22 @@ import { CtaBanner } from "@/sections/cta-banner";
 export const metadata: Metadata = buildMetadata({
   title: "Membership",
   description:
-    "Flexible Silver, Gold, Platinum and Diamond memberships — premium training, coaching and recovery. Cancel anytime.",
+    "Royal Fitness packages — Weight Training, Weight Training + Cardio, and All In One. Flexible 3, 6, and 12-month plans.",
   path: "/membership",
 });
 
 const faqs = [
   {
-    q: "What's included in each tier?",
-    a: "Every tier includes full gym access. Higher tiers add unlimited classes, personal training sessions, recovery access, and VIP concierge on Diamond.",
+    q: "What's the difference between the packages?",
+    a: "Weight Training covers the strength floor with a workout plan and certified trainers. Weight Training + Cardio adds the full cardio zone, functional training and nutrition guidance. All In One includes 1-on-1 personal training and complete result-focused coaching.",
   },
   {
     q: "Is there a joining fee?",
-    a: "No hidden joining fees. You pay the monthly rate shown, and can upgrade or downgrade your tier at any time.",
+    a: "Yes — a one-time ₹300 entry charge is compulsory when you join, in addition to your chosen package price.",
   },
   {
-    q: "Can I pause my membership?",
-    a: "Yes, memberships can be frozen for up to 3 months per year at no cost — perfect for travel or recovery.",
+    q: "Can I refund, transfer, or freeze my membership?",
+    a: "Memberships are non-refundable, non-transferable, and cannot be frozen. Please choose the duration that best fits your schedule.",
   },
 ];
 
@@ -40,7 +40,7 @@ export default function MembershipPage() {
       <PageHeader
         eyebrow="Membership"
         title="Find Your Perfect Plan"
-        description="Four tiers, one standard: excellence. Choose the membership that matches your ambition — upgrade anytime."
+        description="Three packages, one standard: excellence. Choose the plan and duration that match your goals."
       />
 
       <section className="pb-8">
