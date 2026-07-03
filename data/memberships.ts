@@ -61,7 +61,6 @@ export const memberships: MembershipPlan[] = [
     ],
     features: [
       "Everything in + Cardio",
-      "1-on-1 personal training",
       "100% result-focused coaching",
       "Diet & nutrition planning",
       "Group activities & functional",
