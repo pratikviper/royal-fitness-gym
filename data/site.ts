@@ -10,7 +10,7 @@ export const siteConfig = {
   phone: "+91 97300 91331",
   whatsapp: WHATSAPP_NUMBER,
   address:
-    "1st Floor, ICON Imperio, IVY ESTATE, above Reliance Smart Point, Wagholi, Pune, Maharashtra 412207",
+    "1st Floor, ICON Imperio, IVY ESTATE, above Reliance Smart Point, Wagholi, Pune, Maharashtra 412207, India",
   hours: [
     { day: "Monday – Friday", time: "5:00 AM – 11:00 PM" },
     { day: "Saturday", time: "7:00 AM – 9:00 PM" },

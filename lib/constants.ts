@@ -12,5 +12,5 @@ export const CONTACT_EMAIL =
 
 export const GOOGLE_MAPS_EMBED_URL =
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL ??
-  // Keyless embed pointed at the studio (ICON Imperio, Wagholi, Pune).
-  "https://maps.google.com/maps?q=ICON%20Imperio%2C%20Ivy%20Estate%2C%20Wagholi%2C%20Pune%2C%20Maharashtra%20412207&t=&z=15&ie=UTF8&iwloc=&output=embed";
+  // Keyless embed pointed at the studio (Royal Fitness Gym, ICON Imperio, Wagholi, Pune).
+  "https://maps.google.com/maps?q=Royal%20Fitness%20Gym%2C%20ICON%20Imperio%2C%20Ivy%20Estate%2C%20Wagholi%2C%20Pune%2C%20Maharashtra%20412207&t=&z=16&ie=UTF8&iwloc=&output=embed";
