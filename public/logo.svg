@@ -1,0 +1,26 @@
+<svg width="320" height="88" viewBox="0 0 320 88" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Royal Fitness">
+  <defs>
+    <linearGradient id="rf-silver" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f5f5f5"/>
+      <stop offset="0.5" stop-color="#bdbdbd"/>
+      <stop offset="0.55" stop-color="#f5f5f5"/>
+      <stop offset="1" stop-color="#8f8f8f"/>
+    </linearGradient>
+    <linearGradient id="rf-red" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e11d3a"/>
+      <stop offset="1" stop-color="#9c1023"/>
+    </linearGradient>
+  </defs>
+  <!-- Crown mark -->
+  <g transform="translate(8 14)">
+    <path d="M4 40 L10 12 L24 30 L38 6 L52 30 L66 12 L72 40 Z"
+          fill="url(#rf-red)" stroke="url(#rf-silver)" stroke-width="1.5" stroke-linejoin="round"/>
+    <rect x="4" y="42" width="68" height="8" rx="2" fill="url(#rf-silver)"/>
+    <circle cx="10" cy="12" r="3.5" fill="url(#rf-silver)"/>
+    <circle cx="38" cy="6" r="4" fill="url(#rf-silver)"/>
+    <circle cx="66" cy="12" r="3.5" fill="url(#rf-silver)"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="96" y="46" font-family="'Bebas Neue', Impact, sans-serif" font-size="34" letter-spacing="2" fill="url(#rf-silver)">ROYAL</text>
+  <text x="96" y="74" font-family="'Bebas Neue', Impact, sans-serif" font-size="20" letter-spacing="6" fill="url(#rf-red)">FITNESS</text>
+</svg>

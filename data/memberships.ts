@@ -1,0 +1,65 @@
+import type { MembershipPlan } from "@/types";
+
+export const memberships: MembershipPlan[] = [
+  {
+    id: "silver",
+    tier: "Silver",
+    price: 39,
+    period: "/month",
+    tagline: "Start your journey",
+    accent: "hsl(0 0% 75%)",
+    features: [
+      "Full gym floor access",
+      "2 group classes / week",
+      "Locker & towel service",
+      "Fitness assessment",
+    ],
+  },
+  {
+    id: "gold",
+    tier: "Gold",
+    price: 69,
+    period: "/month",
+    tagline: "Level up your training",
+    accent: "hsl(43 74% 55%)",
+    features: [
+      "Everything in Silver",
+      "Unlimited group classes",
+      "1 PT session / month",
+      "Nutrition guidance",
+      "Sauna & steam access",
+    ],
+  },
+  {
+    id: "platinum",
+    tier: "Platinum",
+    price: 109,
+    period: "/month",
+    tagline: "Serious about results",
+    accent: "hsl(210 12% 78%)",
+    features: [
+      "Everything in Gold",
+      "4 PT sessions / month",
+      "Custom training plan",
+      "Recovery zone access",
+      "Guest passes (2/month)",
+    ],
+  },
+  {
+    id: "diamond",
+    tier: "Diamond",
+    price: 179,
+    period: "/month",
+    tagline: "The royal experience",
+    accent: "hsl(351 83% 52%)",
+    featured: true,
+    features: [
+      "Everything in Platinum",
+      "Unlimited PT sessions",
+      "Dedicated head coach",
+      "Priority class booking",
+      "InBody scans monthly",
+      "VIP lounge & concierge",
+    ],
+  },
+];
