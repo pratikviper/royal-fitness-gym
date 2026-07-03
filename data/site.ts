@@ -5,16 +5,17 @@ export const siteConfig = {
   name: "Royal Fitness",
   tagline: "Train Like Royalty",
   description:
-    "A premium, elite training club with world-class coaches and luxury facilities.",
+    "A community-driven fitness hub in Wagholi, Pune — training warriors since 2017.",
   email: CONTACT_EMAIL,
   phone: "+91 97300 91331",
+  phoneAlt: "+91 86691 08946",
   whatsapp: WHATSAPP_NUMBER,
   address:
     "1st Floor, ICON Imperio, IVY ESTATE, above Reliance Smart Point, Wagholi, Pune, Maharashtra 412207, India",
   hours: [
-    { day: "Monday – Friday", time: "5:00 AM – 11:00 PM" },
-    { day: "Saturday", time: "7:00 AM – 9:00 PM" },
-    { day: "Sunday", time: "7:00 AM – 9:00 PM" },
+    { day: "Monday – Saturday", time: "5:00 AM – 10:00 PM" },
+    { day: "Sunday", time: "5:00 PM – 9:30 PM" },
+    { day: "Every 3rd Sunday", time: "Closed (Inspection)" },
   ],
   socials: [
     { label: "Instagram", href: "https://instagram.com", icon: "Instagram" },

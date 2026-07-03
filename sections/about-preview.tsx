@@ -40,10 +40,10 @@ export function AboutPreview() {
             {/* Floating stat card — sits inside the image on mobile, offset on larger screens */}
             <div className="glass-strong absolute bottom-4 right-4 rounded-2xl p-4 sm:p-5 lg:-bottom-6 lg:-right-6">
               <div className="font-heading text-3xl text-royal-gradient sm:text-4xl">
-                12+
+                2017
               </div>
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground sm:text-xs">
-                Years Forging <br /> Champions
+                Serving Wagholi <br /> Since
               </div>
             </div>
           </div>
@@ -54,8 +54,8 @@ export function AboutPreview() {
           <SectionTitle
             align="left"
             eyebrow="Who We Are"
-            title="Where Discipline Meets Luxury"
-            description="Royal Fitness is more than a gym — it's an elite performance club. We fuse world-class coaching with a premium environment so you can train, recover, and transform without compromise."
+            title="We Train Warriors, Not Members"
+            description="Since 2017, Royal Fitness has been Wagholi's community-driven fitness hub — built on discipline, strength, and support. Real coaching, real results, for over 1,000 members across 20+ societies."
           />
 
           <StaggerGroup className="mt-10 space-y-6">

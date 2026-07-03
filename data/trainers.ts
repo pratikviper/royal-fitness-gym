@@ -1,55 +1,62 @@
 import type { Trainer } from "@/types";
 
 /**
- * Trainer roster (5 trainers). Images point to /public/trainers/placeholder.svg
- * — drop real photos into /public/trainers and update the `image` paths.
+ * Trainer roster. Royal Fitness has two categories — Senior and Junior.
+ * Senior trainers are the two real coaches; junior entries are placeholders —
+ * drop real names + photos into /public/trainers and update below.
  */
 const PLACEHOLDER = "/trainers/placeholder.svg";
 
+/** Personal-training rates (INR) by category. */
+export const PT_RATES = { Senior: 8000, Junior: 6000 } as const;
+
 export const trainers: Trainer[] = [
   {
-    id: "marcus-cole",
-    name: "Marcus Cole",
-    role: "Head Coach",
-    experience: "12+ years",
-    specialization: "Strength & Conditioning",
+    id: "hrushabh-chaube",
+    name: "Hrushabh Chaube",
+    category: "Senior",
+    specialization: "Strength & Bodybuilding",
     image: PLACEHOLDER,
-    socials: { instagram: "#", twitter: "#", linkedin: "#" },
-  },
-  {
-    id: "elena-frost",
-    name: "Elena Frost",
-    role: "Personal Trainer",
-    experience: "9 years",
-    specialization: "HIIT & Fat Loss",
-    image: PLACEHOLDER,
-    socials: { instagram: "#", facebook: "#" },
-  },
-  {
-    id: "andre-silva",
-    name: "Andre Silva",
-    role: "Personal Trainer",
-    experience: "10 years",
-    specialization: "Weight Training",
-    image: PLACEHOLDER,
-    socials: { instagram: "#", twitter: "#" },
-  },
-  {
-    id: "nadia-khan",
-    name: "Nadia Khan",
-    role: "Personal Trainer",
-    experience: "6 years",
-    specialization: "Functional & Mobility",
-    image: PLACEHOLDER,
+    ptRate: PT_RATES.Senior,
     socials: { instagram: "#", linkedin: "#" },
   },
   {
-    id: "liam-reyes",
-    name: "Liam Reyes",
-    role: "Personal Trainer",
-    experience: "8 years",
-    specialization: "Bodybuilding & Nutrition",
+    id: "prashan-gaurav",
+    name: "Prashan Gaurav",
+    category: "Senior",
+    specialization: "Program Design & Personal Training",
     image: PLACEHOLDER,
-    socials: { instagram: "#", twitter: "#", facebook: "#" },
+    ptRate: PT_RATES.Senior,
+    socials: { instagram: "#", twitter: "#" },
+  },
+  // ── Junior trainers — placeholders, replace with real names/photos ──
+  {
+    id: "junior-1",
+    name: "Junior Coach",
+    category: "Junior",
+    specialization: "Fat Loss & Conditioning",
+    image: PLACEHOLDER,
+    ptRate: PT_RATES.Junior,
+    socials: { instagram: "#" },
+  },
+  {
+    id: "junior-2",
+    name: "Junior Coach",
+    category: "Junior",
+    specialization: "Functional Training",
+    image: PLACEHOLDER,
+    ptRate: PT_RATES.Junior,
+    socials: { instagram: "#" },
+  },
+  {
+    id: "junior-3",
+    name: "Junior Coach",
+    category: "Junior",
+    specialization: "Cardio & CrossFit",
+    image: PLACEHOLDER,
+    ptRate: PT_RATES.Junior,
+    socials: { instagram: "#" },
   },
 ];
+
+export const trainerCategories = ["All", "Senior", "Junior"] as const;

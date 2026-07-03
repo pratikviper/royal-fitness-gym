@@ -12,6 +12,9 @@ import {
   Users,
   Trophy,
   Target,
+  Building2,
+  HeartPulse,
+  Flower2,
 } from "lucide-react";
 
 export const facilities: Facility[] = [
@@ -58,11 +61,32 @@ export const facilities: Facility[] = [
     icon: Lock,
   },
   {
+    id: "bodybuilding",
+    title: "Bodybuilding",
+    description:
+      "Hypertrophy-focused programming to build serious size and definition.",
+    icon: Dumbbell,
+  },
+  {
+    id: "cardio",
+    title: "Cardio",
+    description:
+      "A full cardio zone to boost endurance, stamina, and heart health.",
+    icon: HeartPulse,
+  },
+  {
     id: "zumba",
     title: "Zumba",
     description:
       "High-energy Zumba classes that make cardio genuinely fun.",
     icon: Music2,
+  },
+  {
+    id: "yoga",
+    title: "Yoga",
+    description:
+      "Guided yoga sessions to improve flexibility, balance, and recovery.",
+    icon: Flower2,
   },
   {
     id: "crossfit-abs",
@@ -81,8 +105,8 @@ export const facilities: Facility[] = [
 ];
 
 export const stats: StatItem[] = [
-  { label: "Members", value: 500, suffix: "+", icon: Users },
-  { label: "Certified Trainers", value: 25, suffix: "+", icon: BadgeCheck },
-  { label: "Years of Experience", value: 10, suffix: "+", icon: Trophy },
-  { label: "Transformation Focus", value: 100, suffix: "%", icon: Target },
+  { label: "Active Members", value: 1000, suffix: "+", icon: Users },
+  { label: "Societies Served", value: 20, suffix: "+", icon: Building2 },
+  { label: "Years Strong", value: 8, suffix: "+", icon: Trophy },
+  { label: "Result Focus", value: 100, suffix: "%", icon: Target },
 ];

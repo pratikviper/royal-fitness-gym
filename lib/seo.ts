@@ -4,7 +4,7 @@ import { SITE_URL } from "@/lib/constants";
 export const SITE_NAME = "Royal Fitness";
 export const SITE_TAGLINE = "Train Like Royalty";
 export const SITE_DESCRIPTION =
-  "Royal Fitness is a premium, elite training club. World-class trainers, luxury facilities, and results-driven programs. Train like royalty.";
+  "Royal Fitness is Wagholi, Pune's community-driven gym — training warriors since 2017. Weight training, cardio, CrossFit, Zumba, yoga, functional training and expert personal coaching.";
 
 /**
  * Build page metadata with sensible OpenGraph / Twitter defaults.
@@ -66,7 +66,7 @@ export function organizationJsonLd() {
       postalCode: "412207",
       addressCountry: "IN",
     },
-    openingHours: ["Mo-Fr 05:00-23:00", "Sa-Su 07:00-21:00"],
-    priceRange: "$$$",
+    openingHours: ["Mo-Sa 05:00-22:00", "Su 17:00-21:30"],
+    priceRange: "₹₹",
   };
 }

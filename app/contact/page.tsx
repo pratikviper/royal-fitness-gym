@@ -48,7 +48,7 @@ export default function ContactPage() {
                 <InfoRow
                   icon={Phone}
                   label="Phone"
-                  value={siteConfig.phone}
+                  value={`${siteConfig.phone}  ·  ${siteConfig.phoneAlt}`}
                   href={`tel:${siteConfig.phone}`}
                 />
                 <InfoRow

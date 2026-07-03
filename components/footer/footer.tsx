@@ -77,9 +77,18 @@ export function Footer() {
             </li>
             <li className="flex items-center gap-2">
               <Phone className="size-4 shrink-0 text-royal" />
-              <a href={`tel:${siteConfig.phone}`} className="hover:text-royal">
-                {siteConfig.phone}
-              </a>
+              <span className="flex flex-wrap gap-x-2">
+                <a href={`tel:${siteConfig.phone}`} className="hover:text-royal">
+                  {siteConfig.phone}
+                </a>
+                <span className="text-white/20">·</span>
+                <a
+                  href={`tel:${siteConfig.phoneAlt}`}
+                  className="hover:text-royal"
+                >
+                  {siteConfig.phoneAlt}
+                </a>
+              </span>
             </li>
             <li className="flex items-center gap-2">
               <Mail className="size-4 shrink-0 text-royal" />

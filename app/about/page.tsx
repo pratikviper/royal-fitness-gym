@@ -71,8 +71,8 @@ export default function AboutPage() {
     <>
       <PageHeader
         eyebrow="Our Story"
-        title="Forging Champions Since 2013"
-        description="Royal Fitness was founded on a simple belief: everyone deserves elite coaching in an environment that inspires greatness."
+        title="Training Warriors Since 2017"
+        description="Royal Fitness was born from the belief that fitness isn't just physical — it's a way of life. In Wagholi, Pune, we train warriors, not members."
       />
 
       {/* Story */}
@@ -91,15 +91,14 @@ export default function AboutPage() {
             <SectionTitle
               align="left"
               eyebrow="The Mission"
-              title="More Than a Gym"
-              description="What began as a single strength studio has grown into a full-scale performance club — without ever losing the personal, coach-first approach that defines us."
+              title="A Way Of Life"
+              description="Since 2017 we've grown into Wagholi's community-driven fitness hub, built on discipline, strength, and support — now home to 1,000+ members across 20+ societies."
               animateTitle={false}
             />
             <p className="mt-6 text-muted-foreground">
-              We combine science-backed programming with a genuinely premium
-              environment. Our coaches take the time to understand your goals,
-              your lifestyle, and your limits — then build a path that gets you
-              results and keeps you coming back.
+              Our senior and junior trainers take the time to understand your
+              goals, your lifestyle, and your limits — then build a path that
+              gets you real, sustainable results. Bigger. Faster. Stronger.
             </p>
           </div>
         </Container>

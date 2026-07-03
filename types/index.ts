@@ -22,13 +22,17 @@ export interface MembershipPlan {
   accent: string; // hsl string used for the card accent
 }
 
+/** Royal Fitness has two trainer categories. */
+export type TrainerLevel = "Senior" | "Junior";
+
 export interface Trainer {
   id: string;
   name: string;
-  role: string; // e.g. "Personal Trainer" / "Head Coach"
-  experience: string;
+  category: TrainerLevel;
   specialization: string;
   image: string;
+  /** personal-training rate (INR) */
+  ptRate: number;
   socials: {
     instagram?: string;
     twitter?: string;

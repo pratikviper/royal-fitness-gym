@@ -10,8 +10,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { Trainer } from "@/types";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatCurrency, cn } from "@/lib/utils";
 
 const socialIcons: Record<string, LucideIcon> = {
   instagram: Instagram,
@@ -20,7 +20,7 @@ const socialIcons: Record<string, LucideIcon> = {
   linkedin: Linkedin,
 };
 
-/** Reusable trainer card: image, name, role, experience, specialization,
+/** Reusable trainer card: image, name, category, specialization, PT rate,
  * socials and a booking CTA. Image reveals + lifts on hover. */
 export function TrainerCard({ trainer }: { trainer: Trainer }) {
   return (
@@ -29,6 +29,7 @@ export function TrainerCard({ trainer }: { trainer: Trainer }) {
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
+      exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.5 }}
       className="group relative overflow-hidden rounded-2xl border border-white/10 bg-card"
     >
@@ -43,8 +44,15 @@ export function TrainerCard({ trainer }: { trainer: Trainer }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/20 to-transparent" />
 
-        <span className="absolute left-4 top-4 rounded-full bg-royal-gradient px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
-          {trainer.role}
+        <span
+          className={cn(
+            "absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest",
+            trainer.category === "Senior"
+              ? "bg-royal-gradient text-white"
+              : "bg-silver-gradient text-ink",
+          )}
+        >
+          {trainer.category} Trainer
         </span>
 
         {/* Socials — slide up on hover */}
@@ -75,9 +83,11 @@ export function TrainerCard({ trainer }: { trainer: Trainer }) {
           <p className="text-sm text-royal">{trainer.specialization}</p>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{trainer.experience} experience</span>
-          <Badge variant="ghost">{trainer.role}</Badge>
+        <div className="flex items-center justify-between border-t border-white/5 pt-3 text-xs text-muted-foreground">
+          <span>Personal training</span>
+          <span className="font-heading text-base text-foreground">
+            {formatCurrency(trainer.ptRate, "INR", "en-IN")}
+          </span>
         </div>
 
         <Button variant="outline" size="sm" className="w-full" asChild>
