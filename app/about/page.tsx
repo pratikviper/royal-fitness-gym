@@ -80,11 +80,11 @@ export default function AboutPage() {
         <Container className="grid items-center gap-12 lg:grid-cols-2">
           <Reveal variant="right">
             <ImageReveal
-              src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=900&q=70"
-              alt="Inside the Royal Fitness club"
-              width={720}
-              height={560}
-              className="aspect-[4/3] rounded-3xl border border-white/10"
+              src="/gym/gym-1.png"
+              alt="Inside Royal Fitness — the free-weights floor"
+              width={860}
+              height={573}
+              className="aspect-[3/2] rounded-3xl border border-white/10"
             />
           </Reveal>
           <div>

@@ -72,7 +72,9 @@ export function GalleryGrid() {
               src={img.src}
               alt={img.alt}
               width={800}
-              height={img.span === "tall" ? 1000 : 700}
+              height={
+                img.span === "tall" ? 900 : img.span === "wide" ? 470 : 600
+              }
               loading="lazy"
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               className="h-auto w-full object-cover transition-transform duration-700 group-hover:scale-110"
