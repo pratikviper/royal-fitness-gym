@@ -26,18 +26,15 @@ export function TransformationGallery() {
           </div>
         </div>
 
-        <StaggerGroup className="mt-14 grid grid-cols-2 gap-4 md:grid-cols-3">
-          {preview.map((img, i) => (
-            <StaggerItem
-              key={img.id}
-              className={i === 0 ? "col-span-2 row-span-2 md:col-span-1" : ""}
-            >
+        <StaggerGroup className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {preview.map((img) => (
+            <StaggerItem key={img.id}>
               <ImageReveal
                 src={img.src}
                 alt={img.alt}
                 width={600}
-                height={600}
-                className="aspect-square rounded-2xl border border-white/10"
+                height={400}
+                className="aspect-[3/2] rounded-2xl border border-white/10"
                 imgClassName="transition-transform duration-700 hover:scale-105"
               />
             </StaggerItem>
