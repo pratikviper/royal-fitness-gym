@@ -20,7 +20,7 @@ const tagline = ["Strength", "Discipline", "Transformation"];
 
 export function Hero() {
   return (
-    <section className="relative flex min-h-[100svh] items-center overflow-hidden">
+    <section className="relative flex min-h-[100svh] items-start overflow-hidden py-28 md:items-center md:py-24">
       {/* Layer 0 — photographic background with parallax */}
       <HeroBackground />
 

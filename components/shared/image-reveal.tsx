@@ -31,13 +31,13 @@ export function ImageReveal({
       className={cn("relative overflow-hidden", className)}
       initial={{ clipPath: initialClip }}
       whileInView={{ clipPath: "inset(0% 0% 0% 0%)" }}
-      viewport={{ once: true, margin: "-60px" }}
+      viewport={{ once: true, amount: 0.15 }}
       transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
     >
       <motion.div
-        initial={{ scale: 1.2 }}
+        initial={{ scale: 1.15 }}
         whileInView={{ scale: 1 }}
-        viewport={{ once: true, margin: "-60px" }}
+        viewport={{ once: true, amount: 0.15 }}
         transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
         className="h-full w-full"
       >

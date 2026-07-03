@@ -60,6 +60,7 @@
 
   body {
     @apply bg-background text-foreground font-sans;
+    overflow-x: hidden; /* guard against accidental horizontal scroll on mobile */
     /* subtle vignette + grain feel via layered gradients */
     background-image:
       radial-gradient(120% 80% at 50% -10%, hsl(var(--royal) / 0.08), transparent 55%),

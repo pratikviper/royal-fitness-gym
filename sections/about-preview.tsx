@@ -33,14 +33,16 @@ export function AboutPreview() {
             <ImageReveal
               src="/About.png"
               alt="Inside Royal Fitness"
-              width={720}
-              height={860}
-              className="aspect-[4/5] rounded-3xl border border-white/10"
+              width={860}
+              height={645}
+              className="aspect-[4/3] rounded-3xl border border-white/10 lg:aspect-[4/5]"
             />
-            {/* Floating stat card */}
-            <div className="glass-strong absolute -bottom-6 -right-4 rounded-2xl p-5 sm:-right-8">
-              <div className="font-heading text-4xl text-royal-gradient">12+</div>
-              <div className="text-xs uppercase tracking-widest text-muted-foreground">
+            {/* Floating stat card — sits inside the image on mobile, offset on larger screens */}
+            <div className="glass-strong absolute bottom-4 right-4 rounded-2xl p-4 sm:p-5 lg:-bottom-6 lg:-right-6">
+              <div className="font-heading text-3xl text-royal-gradient sm:text-4xl">
+                12+
+              </div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground sm:text-xs">
                 Years Forging <br /> Champions
               </div>
             </div>
