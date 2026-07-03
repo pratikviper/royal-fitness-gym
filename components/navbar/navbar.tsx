@@ -28,7 +28,7 @@ export function Navbar() {
 
         <nav
           aria-label="Primary"
-          className="hidden items-center gap-8 md:flex"
+          className="hidden items-center gap-6 lg:flex"
         >
           {mainNav.map((item) => (
             <NavLink key={item.href} item={item} />
@@ -36,7 +36,7 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <div className="hidden md:block">
+          <div className="hidden lg:block">
             <AnimatedButton href="/membership" size="sm" magnetic={false}>
               Join Now
             </AnimatedButton>

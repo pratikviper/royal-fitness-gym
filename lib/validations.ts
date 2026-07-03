@@ -43,3 +43,41 @@ export const newsletterSchema = z.object({
 });
 
 export type NewsletterValues = z.infer<typeof newsletterSchema>;
+
+/** Workout plan generator schema. */
+export const workoutSchema = z.object({
+  goal: z.enum(["muscle", "fatloss", "strength", "fitness"], {
+    errorMap: () => ({ message: "Pick a goal." }),
+  }),
+  level: z.enum(["beginner", "intermediate", "advanced"], {
+    errorMap: () => ({ message: "Pick your level." }),
+  }),
+  daysPerWeek: z.coerce
+    .number()
+    .int()
+    .min(3, "Choose 3–6 days.")
+    .max(6, "Choose 3–6 days."),
+});
+
+export type WorkoutValues = z.infer<typeof workoutSchema>;
+
+/** Diet plan generator schema (metric units). */
+export const dietSchema = z.object({
+  age: z.coerce.number().min(12, "Must be 12 or older.").max(100, "Enter a valid age."),
+  gender: z.enum(["male", "female"], {
+    errorMap: () => ({ message: "Select a gender." }),
+  }),
+  height: z.coerce.number().min(80, "Height seems too low.").max(260, "Height seems too high."),
+  weight: z.coerce.number().min(25, "Weight seems too low.").max(400, "Weight seems too high."),
+  activity: z.enum(["sedentary", "light", "moderate", "active", "athlete"], {
+    errorMap: () => ({ message: "Select an activity level." }),
+  }),
+  goal: z.enum(["fatloss", "maintain", "muscle"], {
+    errorMap: () => ({ message: "Select a goal." }),
+  }),
+  diet: z.enum(["veg", "nonveg"], {
+    errorMap: () => ({ message: "Select veg or non-veg." }),
+  }),
+});
+
+export type DietValues = z.infer<typeof dietSchema>;

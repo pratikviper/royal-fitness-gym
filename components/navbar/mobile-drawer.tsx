@@ -22,7 +22,7 @@ export function MobileDrawer() {
         aria-label="Open menu"
         aria-expanded={open}
         onClick={() => setOpen(true)}
-        className="grid size-11 place-items-center rounded-full border border-white/10 text-foreground md:hidden"
+        className="grid size-11 place-items-center rounded-full border border-white/10 text-foreground lg:hidden"
       >
         <Menu className="size-5" />
       </button>
@@ -33,7 +33,7 @@ export function MobileDrawer() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] md:hidden"
+            className="fixed inset-0 z-[80] lg:hidden"
           >
             <div className="absolute inset-0 glass-strong" />
             <motion.nav
