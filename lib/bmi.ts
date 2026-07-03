@@ -3,13 +3,22 @@
 export interface BmiResult {
   bmi: number;
   category: "Underweight" | "Normal" | "Overweight" | "Obese";
-  /** 0–1 position on the gauge (18.5→30 mapped for visual arc) */
+  /** 0–1 position on the gauge, mapped on the shared BMI_MIN..BMI_MAX scale */
   position: number;
   color: string; // hsl string for the gauge needle/label
   advice: string;
 }
 
+/** Gauge scale — shared by the position math and the gauge's colored bands so
+ *  the needle always lands in the band that matches the category. */
+export const BMI_MIN = 15;
+export const BMI_MAX = 40;
+
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+/** Convert a BMI value to its 0–1 position on the gauge scale. */
+export const bmiToPosition = (bmi: number) =>
+  clamp01((bmi - BMI_MIN) / (BMI_MAX - BMI_MIN));
 
 /** height in cm, weight in kg. */
 export function calculateBmi(heightCm: number, weightKg: number): BmiResult {
@@ -17,8 +26,7 @@ export function calculateBmi(heightCm: number, weightKg: number): BmiResult {
   const bmi = weightKg / (meters * meters);
   const rounded = Math.round(bmi * 10) / 10;
 
-  // Map BMI 12–40 onto the 0–1 gauge for the animated arc.
-  const position = clamp01((bmi - 12) / (40 - 12));
+  const position = bmiToPosition(bmi);
 
   if (bmi < 18.5) {
     return {

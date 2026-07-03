@@ -1,11 +1,40 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { bmiToPosition } from "@/lib/bmi";
 
 /**
- * Semicircular BMI gauge. `position` is 0–1 across the arc (left→right).
- * The colored track shows the four BMI bands; the needle animates to position.
+ * Semicircular BMI gauge. `position` is 0–1 across the arc (left→right) on the
+ * same BMI_MIN..BMI_MAX scale as the colored bands, so the needle always lands
+ * in the band that matches the category. Threshold ticks (18.5 / 25 / 30) are
+ * placed at their true positions.
  */
+const CX = 100;
+const CY = 105;
+const R = 85;
+
+// Fraction 0..1 (left→right along the top semicircle) → point on the arc.
+function pointAt(f: number) {
+  const angle = Math.PI * (1 - f); // 180° at f=0, 0° at f=1
+  return { x: CX + R * Math.cos(angle), y: CY - R * Math.sin(angle) };
+}
+
+function arcPath(f0: number, f1: number) {
+  const a = pointAt(f0);
+  const b = pointAt(f1);
+  return `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} A ${R} ${R} 0 0 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
+}
+
+// Bands positioned by real BMI thresholds via the shared scale.
+const BANDS = [
+  { to: 18.5, color: "hsl(200 90% 55%)" }, // Underweight
+  { to: 25, color: "hsl(142 70% 45%)" }, // Normal
+  { to: 30, color: "hsl(38 92% 52%)" }, // Overweight
+  { to: 40, color: "hsl(351 83% 52%)" }, // Obese
+];
+
+const TICKS = [18.5, 25, 30];
+
 export function BmiGauge({
   position,
   color,
@@ -17,44 +46,72 @@ export function BmiGauge({
   value: number | null;
   category: string | null;
 }) {
-  // Needle angle: -90deg (left) to +90deg (right).
   const angle = -90 + position * 180;
-
-  // Arc band definitions (share the 180° sweep). Colors match lib/bmi.ts.
-  const bands = [
-    { color: "hsl(200 90% 55%)", dash: "18 82" }, // underweight
-    { color: "hsl(142 70% 45%)", dash: "22 78" }, // normal
-    { color: "hsl(38 92% 52%)", dash: "18 82" }, // overweight
-    { color: "hsl(351 83% 52%)", dash: "30 70" }, // obese
-  ];
 
   return (
     <div className="relative mx-auto w-full max-w-sm">
-      <svg viewBox="0 0 200 120" className="w-full">
+      <svg viewBox="0 0 200 128" className="w-full">
         {/* Base track */}
         <path
-          d="M 15 105 A 85 85 0 0 1 185 105"
+          d={arcPath(0, 1)}
           fill="none"
           stroke="hsl(0 0% 18%)"
           strokeWidth="14"
           strokeLinecap="round"
         />
 
-        {/* Colored bands drawn as offset dash segments */}
-        {bands.map((band, i) => (
-          <path
-            key={i}
-            d="M 15 105 A 85 85 0 0 1 185 105"
-            fill="none"
-            stroke={band.color}
-            strokeWidth="14"
-            strokeLinecap="round"
-            pathLength={100}
-            strokeDasharray={band.dash}
-            strokeDashoffset={-i * 25}
-            opacity={0.85}
-          />
-        ))}
+        {/* Colored bands at true BMI thresholds */}
+        {BANDS.map((band, i) => {
+          const from = i === 0 ? 0 : bmiToPosition(BANDS[i - 1].to);
+          const to = bmiToPosition(band.to);
+          return (
+            <path
+              key={band.to}
+              d={arcPath(from, to)}
+              fill="none"
+              stroke={band.color}
+              strokeWidth="14"
+              strokeLinecap="butt"
+              opacity={0.9}
+            />
+          );
+        })}
+
+        {/* Threshold ticks + labels */}
+        {TICKS.map((t) => {
+          const f = bmiToPosition(t);
+          const outer = pointAt(f);
+          const inner = {
+            x: CX + (R - 9) * Math.cos(Math.PI * (1 - f)),
+            y: CY - (R - 9) * Math.sin(Math.PI * (1 - f)),
+          };
+          const label = {
+            x: CX + (R + 9) * Math.cos(Math.PI * (1 - f)),
+            y: CY - (R + 9) * Math.sin(Math.PI * (1 - f)),
+          };
+          return (
+            <g key={t}>
+              <line
+                x1={inner.x}
+                y1={inner.y}
+                x2={outer.x}
+                y2={outer.y}
+                stroke="hsl(0 0% 100% / 0.5)"
+                strokeWidth="1"
+              />
+              <text
+                x={label.x}
+                y={label.y}
+                fill="hsl(0 0% 60%)"
+                fontSize="6.5"
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                {t}
+              </text>
+            </g>
+          );
+        })}
 
         {/* Needle */}
         <motion.g
@@ -67,7 +124,7 @@ export function BmiGauge({
             x1="100"
             y1="105"
             x2="100"
-            y2="35"
+            y2="38"
             stroke={color}
             strokeWidth="3"
             strokeLinecap="round"
