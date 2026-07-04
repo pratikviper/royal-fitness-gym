@@ -5,6 +5,10 @@ import type { Trainer } from "@/types";
  * Senior trainers are the two real coaches; junior entries are placeholders —
  * drop real names + photos into /public/trainers and update below.
  */
+const Hrushabh = "/trainers/HRUSHABHCHAUBE.png";
+const Prashan = "/trainers/PRASHANGAURAV.png";
+const Junior1 = "/trainers/Junior1.png";
+const Junior2 = "/trainers/Junior2.png";
 const PLACEHOLDER = "/trainers/placeholder.svg";
 
 /** Personal-training rates (INR) by category. */
@@ -16,7 +20,7 @@ export const trainers: Trainer[] = [
     name: "Hrushabh Chaube",
     category: "Senior",
     specialization: "Strength & Bodybuilding",
-    image: PLACEHOLDER,
+    image: Hrushabh,
     ptRate: PT_RATES.Senior,
     socials: { instagram: "#", linkedin: "#" },
   },
@@ -25,7 +29,7 @@ export const trainers: Trainer[] = [
     name: "Prashan Gaurav",
     category: "Senior",
     specialization: "Program Design & Personal Training",
-    image: PLACEHOLDER,
+    image: Prashan,
     ptRate: PT_RATES.Senior,
     socials: { instagram: "#", twitter: "#" },
   },
@@ -35,7 +39,7 @@ export const trainers: Trainer[] = [
     name: "Junior Coach",
     category: "Junior",
     specialization: "Fat Loss & Conditioning",
-    image: PLACEHOLDER,
+    image: Junior1,
     ptRate: PT_RATES.Junior,
     socials: { instagram: "#" },
   },
@@ -44,7 +48,7 @@ export const trainers: Trainer[] = [
     name: "Junior Coach",
     category: "Junior",
     specialization: "Functional Training",
-    image: PLACEHOLDER,
+    image: Junior2,
     ptRate: PT_RATES.Junior,
     socials: { instagram: "#" },
   },

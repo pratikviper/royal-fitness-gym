@@ -46,7 +46,7 @@ export function TrainerCard({ trainer }: { trainer: Trainer }) {
 
         <span
           className={cn(
-            "absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest",
+            "absolute right-4 top-4 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest",
             trainer.category === "Senior"
               ? "bg-royal-gradient text-white"
               : "bg-silver-gradient text-ink",
