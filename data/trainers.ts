@@ -5,8 +5,8 @@ import type { Trainer } from "@/types";
  * Senior trainers are the two real coaches; junior entries are placeholders —
  * drop real names + photos into /public/trainers and update below.
  */
-const Hrushabh = "/trainers/HrushabhChaube.png";
-const Prashan = "/trainers/PrashanGaurav.png";
+const Hrushabh = "/trainers/HRUSHABHCHAUBE.png";
+const Prashant = "/trainers/PrashanGaurav.png";
 const Junior1 = "/trainers/Junior1.png";
 const Junior2 = "/trainers/Junior2.png";
 const PLACEHOLDER = "/trainers/placeholder.svg";
@@ -25,11 +25,11 @@ export const trainers: Trainer[] = [
     socials: { instagram: "#", linkedin: "#" },
   },
   {
-    id: "prashan-gaurav",
-    name: "Prashan Gaurav",
+    id: "prashant-gaurav",
+    name: "Prashant Gaurav",
     category: "Senior",
     specialization: "Program Design & Personal Training",
-    image: Prashan,
+    image: Prashant,
     ptRate: PT_RATES.Senior,
     socials: { instagram: "#", twitter: "#" },
   },
