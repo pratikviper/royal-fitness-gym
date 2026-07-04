@@ -5,8 +5,8 @@ import type { Trainer } from "@/types";
  * Senior trainers are the two real coaches; junior entries are placeholders —
  * drop real names + photos into /public/trainers and update below.
  */
-const Hrushabh = "/trainers/HRUSHABHCHAUBE.png";
-const Prashan = "/trainers/PRASHANGAURAV.png";
+const Hrushabh = "/trainers/HrushabhChaube.png";
+const Prashan = "/trainers/PrashanGaurav.png";
 const Junior1 = "/trainers/Junior1.png";
 const Junior2 = "/trainers/Junior2.png";
 const PLACEHOLDER = "/trainers/placeholder.svg";
