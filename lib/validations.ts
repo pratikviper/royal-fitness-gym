@@ -81,3 +81,27 @@ export const dietSchema = z.object({
 });
 
 export type DietValues = z.infer<typeof dietSchema>;
+
+/** Login form validation schema. */
+export const loginSchema = z.object({
+  email: z.string().email("Enter a valid email address."),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+});
+
+export type LoginValues = z.infer<typeof loginSchema>;
+
+/** Sign up form validation schema. */
+export const signUpSchema = z
+  .object({
+    name: z.string().min(2, "Please enter your full name."),
+    email: z.string().email("Enter a valid email address."),
+    password: z.string().min(6, "Password must be at least 6 characters."),
+    confirmPassword: z.string().min(6, "Confirm password must be at least 6 characters."),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
+export type SignUpValues = z.infer<typeof signUpSchema>;
+

@@ -9,11 +9,13 @@ import { mainNav } from "@/data/navigation";
 import { cn } from "@/lib/utils";
 import { AnimatedButton } from "@/components/shared/animated-button";
 import { Logo } from "@/components/shared/logo";
+import { useAuth } from "@/lib/auth-context";
 
 /** Full-screen animated mobile navigation drawer. */
 export function MobileDrawer() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
   return (
     <>
@@ -55,7 +57,15 @@ export function MobileDrawer() {
                 </button>
               </div>
 
-              <ul className="mt-12 flex flex-col gap-2">
+              {user && (
+                <div className="mt-6 border-b border-white/5 pb-2">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Hello, <span className="font-semibold text-white">{user.displayName || "Member"}</span>
+                  </p>
+                </div>
+              )}
+
+              <ul className="mt-8 flex flex-col gap-2">
                 {mainNav.map((item, i) => {
                   const active =
                     item.href === "/"
@@ -83,14 +93,40 @@ export function MobileDrawer() {
                 })}
               </ul>
 
-              <div className="mt-auto">
-                <AnimatedButton
-                  href="/membership"
-                  className="w-full"
-                  magnetic={false}
-                >
-                  Join Now
-                </AnimatedButton>
+              <div className="mt-auto space-y-3">
+                {user ? (
+                  <AnimatedButton
+                    onClick={() => {
+                      logout();
+                      setOpen(false);
+                    }}
+                    variant="outline"
+                    className="w-full"
+                    magnetic={false}
+                  >
+                    Logout
+                  </AnimatedButton>
+                ) : (
+                  <>
+                    <AnimatedButton
+                      href="/login"
+                      onClick={() => setOpen(false)}
+                      variant="ghost"
+                      className="w-full"
+                      magnetic={false}
+                    >
+                      Login
+                    </AnimatedButton>
+                    <AnimatedButton
+                      href="/signup"
+                      onClick={() => setOpen(false)}
+                      className="w-full"
+                      magnetic={false}
+                    >
+                      Join Now
+                    </AnimatedButton>
+                  </>
+                )}
               </div>
             </motion.nav>
           </motion.div>

@@ -7,12 +7,14 @@ import { Logo } from "@/components/shared/logo";
 import { NavLink } from "@/components/navbar/nav-link";
 import { MobileDrawer } from "@/components/navbar/mobile-drawer";
 import { AnimatedButton } from "@/components/shared/animated-button";
+import { useAuth } from "@/lib/auth-context";
 
 /**
  * Sticky navbar: transparent at the top, frosted-glass + border once scrolled.
  */
 export function Navbar() {
   const scrolled = useScrolled(24);
+  const { user, logout } = useAuth();
 
   return (
     <header
@@ -36,10 +38,26 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <div className="hidden lg:block">
-            <AnimatedButton href="/membership" size="sm" magnetic={false}>
-              Join Now
-            </AnimatedButton>
+          <div className="hidden lg:flex items-center gap-3">
+            {user ? (
+              <>
+                <span className="text-xs uppercase tracking-wider text-muted-foreground mr-1">
+                  Hello, <span className="font-semibold text-white">{user.displayName || "Member"}</span>
+                </span>
+                <AnimatedButton onClick={logout} size="sm" variant="outline" magnetic={false}>
+                  Logout
+                </AnimatedButton>
+              </>
+            ) : (
+              <>
+                <AnimatedButton href="/login" size="sm" variant="ghost" magnetic={false}>
+                  Login
+                </AnimatedButton>
+                <AnimatedButton href="/signup" size="sm" magnetic={false}>
+                  Join Now
+                </AnimatedButton>
+              </>
+            )}
           </div>
           <MobileDrawer />
         </div>
