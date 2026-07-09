@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -10,12 +10,41 @@ import { cn } from "@/lib/utils";
 import { AnimatedButton } from "@/components/shared/animated-button";
 import { Logo } from "@/components/shared/logo";
 import { useAuth } from "@/lib/auth-context";
+import { getProfileDetails } from "@/lib/profile-db";
+import { Avatar } from "@/components/shared/avatar";
 
 /** Full-screen animated mobile navigation drawer. */
 export function MobileDrawer() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const [displayName, setDisplayName] = useState("Member");
+  const [photoURL, setPhotoURL] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    setDisplayName(user.displayName || "Member");
+
+    const loadProfile = async () => {
+      try {
+        const details = await getProfileDetails(user.uid, user.email, user.displayName);
+        setDisplayName(details.fullName);
+        setPhotoURL(details.photoURL || null);
+      } catch (err) {
+        console.warn("Failed to load profile for mobile drawer:", err);
+      }
+    };
+    loadProfile();
+
+    const handleStorageChange = () => {
+      loadProfile();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [user]);
 
   return (
     <>
@@ -58,10 +87,12 @@ export function MobileDrawer() {
               </div>
 
               {user && (
-                <div className="mt-6 border-b border-white/5 pb-2">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Hello, <span className="font-semibold text-white">{user.displayName || "Member"}</span>
-                  </p>
+                <div className="mt-6 border-b border-white/5 pb-4 flex items-center gap-3">
+                  <Avatar size="sm" src={photoURL} name={displayName} />
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Hello,</p>
+                    <p className="font-heading text-base font-bold text-white leading-tight">{displayName}</p>
+                  </div>
                 </div>
               )}
 
@@ -91,6 +122,26 @@ export function MobileDrawer() {
                     </motion.li>
                   );
                 })}
+
+                {user && (
+                  <motion.li
+                    key="/profile"
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 + mainNav.length * 0.06 }}
+                  >
+                    <Link
+                      href="/profile"
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "block border-b border-white/5 py-4 font-heading text-3xl tracking-wide transition-colors",
+                        pathname === "/profile" ? "text-royal" : "text-foreground",
+                      )}
+                    >
+                      Profile
+                    </Link>
+                  </motion.li>
+                )}
               </ul>
 
               <div className="mt-auto space-y-3">

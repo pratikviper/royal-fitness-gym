@@ -8,6 +8,7 @@ import { Navbar } from "@/components/navbar/navbar";
 import { Footer } from "@/components/footer/footer";
 import { ScrollProgressBar } from "@/components/shared/scroll-progress-bar";
 import { WhatsAppButton } from "@/components/shared/whatsapp-button";
+import LayoutWrapper from "@/components/shared/LayoutWrapper";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -40,11 +41,9 @@ export default function RootLayout({
         />
 
         <Providers>
-          <ScrollProgressBar />
-          <Navbar />
-          <main>{children}</main>
-          <Footer />
-          <WhatsAppButton />
+          <LayoutWrapper>
+            {children}
+          </LayoutWrapper>
         </Providers>
       </body>
     </html>

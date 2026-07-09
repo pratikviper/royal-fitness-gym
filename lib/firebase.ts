@@ -1,4 +1,6 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,5 +19,8 @@ const hasValidKey =
 const app: FirebaseApp | undefined = hasValidKey 
   ? (!getApps().length ? initializeApp(firebaseConfig) : getApp()) 
   : undefined;
+
+export const db = app ? getFirestore(app) : undefined;
+export const storage = app ? getStorage(app) : undefined;
 
 export default app;

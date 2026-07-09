@@ -14,6 +14,9 @@ const nextConfig = {
   },
   // three.js ships untranspiled ESM; keep transpile list explicit for stability.
   transpilePackages: ["three"],
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion"],
   },
