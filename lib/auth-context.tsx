@@ -203,9 +203,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: fbUser.email,
         displayName: fbUser.displayName,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       setLoading(false);
-      throw error;
+      // Log the raw Firebase error code so it's visible in browser console
+      const code = (error as { code?: string })?.code ?? "unknown";
+      const msg  = (error as { message?: string })?.message ?? String(error);
+      console.error("[Google Sign-In] error code:", code);
+      console.error("[Google Sign-In] error message:", msg);
+
+      // Convert Firebase error codes to friendly messages
+      if (code === "auth/popup-blocked") {
+        throw new Error("Popup was blocked by your browser. Please allow popups for this site and try again.");
+      } else if (code === "auth/unauthorized-domain") {
+        throw new Error("This domain is not authorized for Google Sign-In. Add it in Firebase Console → Authentication → Settings → Authorized Domains.");
+      } else if (code === "auth/operation-not-allowed") {
+        throw new Error("Google Sign-In is not enabled. Enable it in Firebase Console → Authentication → Sign-in Method.");
+      } else if (code === "auth/popup-closed-by-user") {
+        throw new Error("Sign-in popup was closed before completing. Please try again.");
+      } else {
+        throw new Error(msg || "Google Sign-In failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
