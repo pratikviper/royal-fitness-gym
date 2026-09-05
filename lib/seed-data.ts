@@ -28,41 +28,11 @@ export async function seedDatabase(adminUid: string): Promise<void> {
     { id: "trainer_4", name: "Vijay Negi", specialization: "Strength & Power", phone: "+91 98765 00004", email: "vijay@royalfitness.com", assignedCount: 2 },
   ];
 
-  // 2. MOCK MEMBERS PROFILE DETAILS
-  const mockMembersProfiles = [
-    { uid: mockUids[0], fullName: "Rohan Sharma", email: "rohan@gmail.com", phoneNumber: "+91 98123 45601", joiningDate: getPastDateStr(90), membershipId: "RF-10021", gender: "Male", age: 24, address: "Sector 15, Noida", dob: "2002-04-12", emergencyContact: "Father: +91 98123 45699", role: "member", trainerId: "trainer_1" },
-    { uid: mockUids[1], fullName: "Priya Patel", email: "priya@gmail.com", phoneNumber: "+91 98123 45602", joiningDate: getPastDateStr(60), membershipId: "RF-10022", gender: "Female", age: 22, address: "Andheri West, Mumbai", dob: "2004-09-22", emergencyContact: "Mother: +91 98123 45698", role: "member", trainerId: "trainer_2" },
-    { uid: mockUids[2], fullName: "Vikram Singh", email: "vikram@gmail.com", phoneNumber: "+91 98123 45603", joiningDate: getPastDateStr(120), membershipId: "RF-10023", gender: "Male", age: 31, address: "DLF Phase 3, Gurugram", dob: "1995-11-05", emergencyContact: "Wife: +91 98123 45697", role: "member", trainerId: "trainer_4" },
-    { uid: mockUids[3], fullName: "Neha Sen", email: "neha@gmail.com", phoneNumber: "+91 98123 45604", joiningDate: getPastDateStr(45), membershipId: "RF-10024", gender: "Female", age: 26, address: "Salt Lake, Kolkata", dob: "2000-02-18", emergencyContact: "Brother: +91 98123 45696", role: "member", trainerId: "trainer_3" },
-    { uid: mockUids[4], fullName: "Karan Malhotra", email: "karan@gmail.com", phoneNumber: "+91 98123 45605", joiningDate: getPastDateStr(15), membershipId: "RF-10025", gender: "Male", age: 28, address: "Indiranagar, Bengaluru", dob: "1998-07-30", emergencyContact: "Friend: +91 98123 45695", role: "member", trainerId: "trainer_1" },
-    { uid: mockUids[5], fullName: "Anjali Mehta", email: "anjali@gmail.com", phoneNumber: "+91 98123 45606", joiningDate: getPastDateStr(80), membershipId: "RF-10026", gender: "Female", age: 27, address: "Ghatkopar, Mumbai", dob: "1999-01-25", emergencyContact: "Husband: +91 98123 45694", role: "member", trainerId: "trainer_2" },
-    { uid: mockUids[6], fullName: "Rahul Verma", email: "rahul@gmail.com", phoneNumber: "+91 98123 45607", joiningDate: getPastDateStr(150), membershipId: "RF-10027", gender: "Male", age: 35, address: "Saket, New Delhi", dob: "1991-08-14", emergencyContact: "Father: +91 98123 45693", role: "member", trainerId: "trainer_3" },
-    { uid: mockUids[7], fullName: "Sneha Rao", email: "sneha@gmail.com", phoneNumber: "+91 98123 45608", joiningDate: getPastDateStr(10), membershipId: "RF-10028", gender: "Female", age: 23, address: "Jayanagar, Bengaluru", dob: "2003-03-08", emergencyContact: "Mother: +91 98123 45692", role: "member", trainerId: "trainer_1" },
-    { uid: mockUids[8], fullName: "Siddharth Joshi", email: "sid@gmail.com", phoneNumber: "+91 98123 45609", joiningDate: getPastDateStr(200), membershipId: "RF-10029", gender: "Male", age: 29, address: "Kothrud, Pune", dob: "1997-12-19", emergencyContact: "Sister: +91 98123 45691", role: "member", trainerId: "trainer_4" },
-    { uid: mockUids[9], fullName: "Aditya Roy", email: "aditya@gmail.com", phoneNumber: "+91 98123 45610", joiningDate: getPastDateStr(35), membershipId: "RF-10030", gender: "Male", age: 25, address: "Bani Park, Jaipur", dob: "2001-05-15", emergencyContact: "Father: +91 98123 45690", role: "member", trainerId: "trainer_3" },
-    // Expiring Soon (<= 7 days remaining)
-    { uid: mockUids[10], fullName: "Kabir Mehta", email: "kabir@gmail.com", phoneNumber: "+91 98123 45611", joiningDate: getPastDateStr(85), membershipId: "RF-10031", gender: "Male", age: 33, address: "Bandra West, Mumbai", dob: "1993-02-28", emergencyContact: "Wife: +91 98123 45689", role: "member", trainerId: "trainer_1" },
-    // Expired
-    { uid: mockUids[11], fullName: "Sanya Sen", email: "sanya@gmail.com", phoneNumber: "+91 98123 45612", joiningDate: getPastDateStr(100), membershipId: "RF-10032", gender: "Female", age: 24, address: "Salt Lake, Kolkata", dob: "2002-10-10", emergencyContact: "Mother: +91 98123 45688", role: "member", trainerId: "trainer_2" },
-  ];
+  // 2. MOCK MEMBERS PROFILE DETAILS (Empty - only real users are added by signups/admin)
+  const mockMembersProfiles: Array<any> = [];
 
   // 3. MOCK MEMBERSHIPS
-  const mockMemberships = [
-    { planId: "all-in-one", planName: "All In One", startDate: getPastDateStr(90), endDate: getFutureDateStr(90), durationMonths: 6, pricePaid: 9000 }, // Rohan
-    { planId: "weight-cardio", planName: "Weight Training + Cardio", startDate: getPastDateStr(60), endDate: getFutureDateStr(30), durationMonths: 3, pricePaid: 5500 }, // Priya
-    { planId: "weight-training", planName: "Weight Training", startDate: getPastDateStr(120), endDate: getFutureDateStr(60), durationMonths: 6, pricePaid: 6500 }, // Vikram
-    { planId: "all-in-one", planName: "All In One", startDate: getPastDateStr(45), endDate: getFutureDateStr(45), durationMonths: 3, pricePaid: 6500 }, // Neha
-    { planId: "all-in-one", planName: "All In One", startDate: getPastDateStr(15), endDate: getFutureDateStr(75), durationMonths: 3, pricePaid: 6500 }, // Karan
-    { planId: "weight-cardio", planName: "Weight Training + Cardio", startDate: getPastDateStr(80), endDate: getFutureDateStr(10), durationMonths: 3, pricePaid: 5500 }, // Anjali
-    { planId: "weight-training", planName: "Weight Training", startDate: getPastDateStr(150), endDate: getFutureDateStr(30), durationMonths: 6, pricePaid: 6500 }, // Rahul
-    { planId: "all-in-one", planName: "All In One", startDate: getPastDateStr(10), endDate: getFutureDateStr(350), durationMonths: 12, pricePaid: 14000 }, // Sneha
-    { planId: "weight-cardio", planName: "Weight Training + Cardio", startDate: getPastDateStr(200), endDate: getFutureDateStr(165), durationMonths: 12, pricePaid: 12000 }, // Siddharth
-    { planId: "weight-training", planName: "Weight Training", startDate: getPastDateStr(35), endDate: getFutureDateStr(55), durationMonths: 3, pricePaid: 4500 }, // Aditya
-    // Expiring Soon (Ends in 4 days)
-    { planId: "weight-cardio", planName: "Weight Training + Cardio", startDate: getPastDateStr(86), endDate: getFutureDateStr(4), durationMonths: 3, pricePaid: 5500 }, // Kabir
-    // Expired (Ended 5 days ago)
-    { planId: "weight-training", planName: "Weight Training", startDate: getPastDateStr(95), endDate: getPastDateStr(5), durationMonths: 3, pricePaid: 4500 }, // Sanya
-  ];
+  const mockMemberships: Array<any> = [];
 
   // 4. HISTORICAL BMI RECORDS (2 per member for trend logging)
   const mockBmiReports: Array<{ uid: string; weightKg: number; heightCm: number; calculatedAt: string; bmiScore: number; category: string }> = [];

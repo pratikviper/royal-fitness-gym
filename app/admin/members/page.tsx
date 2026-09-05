@@ -570,6 +570,64 @@ export default function AdminMembersPage() {
     }
   };
 
+  const handlePurgeAllMembers = async () => {
+    if (!confirm("Are you sure you want to delete ALL member accounts? Only admin accounts will be kept. This action cannot be undone.")) return;
+
+    setLoading(true);
+    try {
+      if (db) {
+        const usersSnap = await getDocs(collection(db, "users"));
+        const memberUidsToDelete: string[] = [];
+
+        usersSnap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const email = (data.email || "").toLowerCase();
+          const isAdmin = data.role === "admin" || email.includes("admin") || email === "admin@royalfitness.com";
+          if (!isAdmin) {
+            memberUidsToDelete.push(docSnap.id);
+          }
+        });
+
+        for (const uid of memberUidsToDelete) {
+          await deleteDoc(doc(db, "users", uid));
+          await deleteDoc(doc(db, "memberships", uid));
+        }
+
+        // Clean up linked collections
+        const collectionsToCheck = ["bmi_reports", "payments", "attendance"];
+        for (const colName of collectionsToCheck) {
+          const snap = await getDocs(collection(db, colName));
+          for (const d of snap.docs) {
+            const data = d.data();
+            const uid = data.uid || d.id;
+            if (memberUidsToDelete.includes(uid) || memberUidsToDelete.includes(d.id)) {
+              await deleteDoc(doc(db, colName, d.id));
+            }
+          }
+        }
+      }
+
+      // Clear localStorage member data
+      if (typeof window !== "undefined") {
+        const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
+        const uids = JSON.parse(uidsJson) as string[];
+        for (const uid of uids) {
+          localStorage.removeItem(`rf_profile_${uid}`);
+          localStorage.removeItem(`rf_membership_${uid}`);
+          localStorage.removeItem(`rf_bmi_history_${uid}`);
+        }
+        localStorage.setItem("rf_member_uids", "[]");
+      }
+
+      showToast("All member accounts purged! Only Admin accounts remain.", "success");
+      loadData();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to purge member accounts.", "error");
+      setLoading(false);
+    }
+  };
+
   // Export Table Data to CSV
   const exportToCSV = () => {
     const headers = [
@@ -699,9 +757,17 @@ export default function AdminMembersPage() {
 
           <Button 
             onClick={exportToCSV}
-            className="h-10 border border-royal bg-royal/5 hover:bg-royal text-royal hover:text-white rounded-lg font-heading font-semibold flex items-center gap-1.5 px-4"
+            className="h-10 border border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-lg font-heading font-semibold flex items-center gap-1.5 px-4 text-xs"
           >
             <Download className="size-3.5" /> Export CSV
+          </Button>
+
+          <Button 
+            onClick={handlePurgeAllMembers}
+            className="h-10 border border-rose-500/20 bg-rose-500/10 hover:bg-rose-600 text-rose-300 hover:text-white rounded-lg font-heading font-semibold flex items-center gap-1.5 px-4 text-xs transition-all"
+            title="Delete all non-admin members from database"
+          >
+            <Trash2 className="size-3.5" /> Purge Members
           </Button>
         </div>
       </div>
