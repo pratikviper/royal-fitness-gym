@@ -12,6 +12,8 @@ import { AnimatedButton } from "@/components/shared/animated-button";
 import { useAuth } from "@/lib/auth-context";
 import { getProfileDetails } from "@/lib/profile-db";
 import { Avatar } from "@/components/shared/avatar";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 /**
  * Sticky navbar: transparent at the top, frosted-glass + border once scrolled.
@@ -21,9 +23,10 @@ export function Navbar() {
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState("Member");
   const [photoURL, setPhotoURL] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) { setIsAdmin(false); return; }
     setDisplayName(user.displayName || "Member");
 
     const loadProfile = async () => {
@@ -37,14 +40,36 @@ export function Navbar() {
     };
     loadProfile();
 
-    const handleStorageChange = () => {
-      loadProfile();
+    // Determine admin role
+    const checkAdmin = async () => {
+      const isAdminEmail = !!(
+        user.email?.toLowerCase() === "admin@royalfitness.com" ||
+        user.email?.toLowerCase().includes("admin")
+      );
+      if (db) {
+        try {
+          const snap = await getDoc(doc(db, "users", user.uid));
+          const role = snap.exists() ? snap.data()?.role : null;
+          setIsAdmin(role === "admin" || isAdminEmail);
+          return;
+        } catch { /* fall through */ }
+      }
+      // localStorage fallback
+      const cached = localStorage.getItem(`rf_profile_${user.uid}`);
+      if (cached) {
+        try {
+          const data = JSON.parse(cached);
+          setIsAdmin(data.role === "admin" || isAdminEmail);
+          return;
+        } catch { /* ignore */ }
+      }
+      setIsAdmin(isAdminEmail);
     };
+    checkAdmin();
 
+    const handleStorageChange = () => { loadProfile(); };
     window.addEventListener("storage", handleStorageChange);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-    };
+    return () => { window.removeEventListener("storage", handleStorageChange); };
   }, [user]);
 
   return (
@@ -69,12 +94,12 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-3">
-          {/* Mobile Profile Avatar */}
+          {/* Mobile Profile Avatar — goes to /admin for admins */}
           {user && (
             <Link
-              href="/profile"
+              href={isAdmin ? "/admin" : "/profile"}
               className="lg:hidden transition-all duration-300 hover:scale-105 active:scale-95"
-              title="View Profile"
+              title={isAdmin ? "Admin Dashboard" : "View Profile"}
             >
               <Avatar size="sm" src={photoURL} name={displayName} className="hover:border-royal hover:shadow-[0_0_8px_rgba(225,29,58,0.2)]" />
             </Link>
@@ -87,9 +112,9 @@ export function Navbar() {
                   Hello, <span className="font-semibold text-white">{displayName}</span>
                 </span>
                 <Link
-                  href="/profile"
+                  href={isAdmin ? "/admin" : "/profile"}
                   className="transition-all duration-300 hover:scale-105"
-                  title="View Profile"
+                  title={isAdmin ? "Admin Dashboard" : "View Profile"}
                 >
                   <Avatar size="md" src={photoURL} name={displayName} className="hover:border-royal hover:shadow-[0_0_12px_rgba(225,29,58,0.3)]" />
                 </Link>

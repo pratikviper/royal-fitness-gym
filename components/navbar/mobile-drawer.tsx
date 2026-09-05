@@ -12,6 +12,8 @@ import { Logo } from "@/components/shared/logo";
 import { useAuth } from "@/lib/auth-context";
 import { getProfileDetails } from "@/lib/profile-db";
 import { Avatar } from "@/components/shared/avatar";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 /** Full-screen animated mobile navigation drawer. */
 export function MobileDrawer() {
@@ -20,9 +22,10 @@ export function MobileDrawer() {
   const { user, logout } = useAuth();
   const [displayName, setDisplayName] = useState("Member");
   const [photoURL, setPhotoURL] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) { setIsAdmin(false); return; }
     setDisplayName(user.displayName || "Member");
 
     const loadProfile = async () => {
@@ -36,14 +39,35 @@ export function MobileDrawer() {
     };
     loadProfile();
 
-    const handleStorageChange = () => {
-      loadProfile();
+    // Determine admin role
+    const checkAdmin = async () => {
+      const isAdminEmail = !!(
+        user.email?.toLowerCase() === "admin@royalfitness.com" ||
+        user.email?.toLowerCase().includes("admin")
+      );
+      if (db) {
+        try {
+          const snap = await getDoc(doc(db, "users", user.uid));
+          const role = snap.exists() ? snap.data()?.role : null;
+          setIsAdmin(role === "admin" || isAdminEmail);
+          return;
+        } catch { /* fall through */ }
+      }
+      const cached = localStorage.getItem(`rf_profile_${user.uid}`);
+      if (cached) {
+        try {
+          const data = JSON.parse(cached);
+          setIsAdmin(data.role === "admin" || isAdminEmail);
+          return;
+        } catch { /* ignore */ }
+      }
+      setIsAdmin(isAdminEmail);
     };
+    checkAdmin();
 
+    const handleStorageChange = () => { loadProfile(); };
     window.addEventListener("storage", handleStorageChange);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-    };
+    return () => { window.removeEventListener("storage", handleStorageChange); };
   }, [user]);
 
   return (
@@ -125,20 +149,20 @@ export function MobileDrawer() {
 
                 {user && (
                   <motion.li
-                    key="/profile"
+                    key={isAdmin ? "/admin" : "/profile"}
                     initial={{ opacity: 0, x: 30 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.1 + mainNav.length * 0.06 }}
                   >
                     <Link
-                      href="/profile"
+                      href={isAdmin ? "/admin" : "/profile"}
                       onClick={() => setOpen(false)}
                       className={cn(
                         "block border-b border-white/5 py-4 font-heading text-3xl tracking-wide transition-colors",
-                        pathname === "/profile" ? "text-royal" : "text-foreground",
+                        (isAdmin ? pathname.startsWith("/admin") : pathname === "/profile") ? "text-royal" : "text-foreground",
                       )}
                     >
-                      Profile
+                      {isAdmin ? "Dashboard" : "Profile"}
                     </Link>
                   </motion.li>
                 )}
