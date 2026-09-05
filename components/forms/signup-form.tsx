@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, AlertCircle, ShieldAlert } from "lucide-react";
+import { Loader2, ShieldAlert, X, ShieldX } from "lucide-react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { signUpSchema, type SignUpValues } from "@/lib/validations";
 import {
@@ -104,12 +105,36 @@ export function SignUpForm() {
         </div>
       )}
 
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
-          <AlertCircle className="size-5 shrink-0 text-red-500" />
-          <p>{error}</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -12, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="relative flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 backdrop-blur-sm px-4 py-4 text-sm text-red-300 overflow-hidden"
+          >
+            {/* Glow bar on left */}
+            <div className="absolute left-0 top-0 h-full w-1 rounded-l-2xl bg-gradient-to-b from-red-400 to-red-600" />
+            {/* Icon */}
+            <div className="mt-0.5 shrink-0 rounded-full border border-red-500/40 bg-red-500/15 p-1.5">
+              <ShieldX className="size-4 text-red-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-red-300 text-xs uppercase tracking-wider mb-0.5">Sign Up Failed</p>
+              <p className="text-red-300/80 text-sm leading-snug">{error}</p>
+            </div>
+            {/* Dismiss button */}
+            <button
+              onClick={() => setError(null)}
+              className="shrink-0 mt-0.5 rounded-full p-1 text-red-400/60 hover:text-red-300 hover:bg-red-500/20 transition-colors"
+              aria-label="Dismiss error"
+            >
+              <X className="size-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Google Sign-Up Button */}
       {!isMock && (
