@@ -73,27 +73,26 @@ export function getDefaultProfile(uid: string, email: string | null, displayName
   };
 }
 
-/** Get default membership details (All In One, active, 45 days remaining out of 90) */
+/** Get default membership details — returns a "no plan" sentinel when admin hasn't assigned one yet. */
 export function getDefaultMembership(): UserMembership {
   return {
-    planId: "all-in-one",
-    planName: "All In One",
-    startDate: getPastDateStr(45),
-    endDate: getFutureDateStr(45),
-    durationMonths: 3,
-    pricePaid: 6500,
+    planId: "none",
+    planName: "No Plan Assigned",
+    startDate: "",
+    endDate: "",
+    durationMonths: 0,
+    pricePaid: 0,
   };
 }
 
-/** Get default BMI details */
+/** Get default BMI details — returns zero sentinels so the profile page shows the first-time setup form. */
 export function getDefaultBmi(): UserBmiDetails {
-  const result = calculateBmi(178, 74);
   return {
-    heightCm: 178,
-    weightKg: 74,
-    calculatedAt: getPastDateStr(10), // Calculated 10 days ago
-    bmiScore: result.bmi,
-    category: result.category,
+    heightCm: 0,
+    weightKg: 0,
+    calculatedAt: "",
+    bmiScore: 0,
+    category: "Normal",
   };
 }
 
@@ -214,7 +213,8 @@ export async function getBmiDetails(uid: string): Promise<UserBmiDetails> {
 export async function updateProfileDetails(
   uid: string,
   fullName: string,
-  phoneNumber: string
+  phoneNumber: string,
+  extras?: { age?: number; gender?: string; dob?: string }
 ): Promise<UserProfileDetails> {
   // Fetch first to get joiningDate, email, membershipId
   const current = await getProfileDetails(uid);
@@ -222,6 +222,9 @@ export async function updateProfileDetails(
     ...current,
     fullName,
     phoneNumber,
+    ...(extras?.age !== undefined && { age: extras.age }),
+    ...(extras?.gender && { gender: extras.gender }),
+    ...(extras?.dob && { dob: extras.dob }),
   };
 
   if (db) {
