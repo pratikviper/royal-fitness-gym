@@ -14,7 +14,8 @@ import {
   Loader2, 
   UserPlus, 
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Package
 } from "lucide-react";
 import { collection, getDocs, doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -37,6 +38,16 @@ import {
   DialogDescription,
   DialogClose
 } from "@/components/ui/dialog";
+
+// Plan model from Firestore plans_models collection
+interface GymPlan {
+  id: string;
+  name: string;
+  price: number;
+  duration: string;
+  status: "Active" | "Inactive";
+  features: string;
+}
 
 // Detailed member structure compiled for the table
 interface CompiledMember {
@@ -72,6 +83,7 @@ export default function AdminMembersPage() {
   
   const [members, setMembers] = useState<CompiledMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [gymPlans, setGymPlans] = useState<GymPlan[]>([]); // Dynamic plans from Firestore
 
   // Search & Filter state
   const [search, setSearch] = useState("");
@@ -116,6 +128,7 @@ export default function AdminMembersPage() {
       let rawProfiles: Record<string, any> = {};
       let rawMemberships: Record<string, any> = {};
       let rawBmiHistory: Record<string, any> = {};
+      let fetchedPlans: GymPlan[] = [];
 
       if (db) {
         try {
@@ -144,13 +157,34 @@ export default function AdminMembersPage() {
             }
             rawBmiHistory[data.uid].push(data);
           });
+
+          // Fetch available plans from plans_models
+          const plansSnap = await getDocs(collection(db, "plans_models"));
+          plansSnap.forEach((doc) => {
+            fetchedPlans.push(doc.data() as GymPlan);
+          });
         } catch (e) {
           console.warn("Firestore error reading members list, using localStorage fallback:", e);
           ({ uids, rawProfiles, rawMemberships, rawBmiHistory } = loadLocalDataFallback());
+          // Load plans from localStorage fallback
+          const plansJson = typeof window !== "undefined" ? localStorage.getItem("rf_plans") || "[]" : "[]";
+          fetchedPlans = JSON.parse(plansJson);
         }
       } else {
         ({ uids, rawProfiles, rawMemberships, rawBmiHistory } = loadLocalDataFallback());
+        const plansJson = typeof window !== "undefined" ? localStorage.getItem("rf_plans") || "[]" : "[]";
+        fetchedPlans = JSON.parse(plansJson);
       }
+
+      // Seed default plans if none found
+      if (fetchedPlans.length === 0) {
+        fetchedPlans = [
+          { id: "weight-training", name: "Weight Training", price: 4500, duration: "3 Months", status: "Active", features: "" },
+          { id: "weight-cardio", name: "Weight Training + Cardio", price: 5500, duration: "3 Months", status: "Active", features: "" },
+          { id: "all-in-one", name: "All In One", price: 6500, duration: "3 Months", status: "Active", features: "" },
+        ];
+      }
+      setGymPlans(fetchedPlans.filter((p) => p.status === "Active"));
 
       // Compile data
       const compiled: CompiledMember[] = uids.map((uid) => {
@@ -166,16 +200,16 @@ export default function AdminMembersPage() {
         // Calculate validity
         const today = new Date();
         today.setHours(0,0,0,0);
-        let planId = "weight-training";
-        let planName = "Weight Training";
-        let startDate = getPastDateStr(30);
-        let endDate = getFutureDateStr(60);
-        let durationMonths = 3;
-        let pricePaid = 4500;
-        let daysRemaining = 60;
-        let status: CompiledMember["status"] = "Active";
+        let planId = "none";
+        let planName = "No Plan";
+        let startDate = "";
+        let endDate = "";
+        let durationMonths = 0;
+        let pricePaid = 0;
+        let daysRemaining = 0;
+        let status: CompiledMember["status"] = "Expired";
 
-        if (m) {
+        if (m && m.planId && m.planId !== "none") {
           planId = m.planId;
           planName = m.planName;
           startDate = m.startDate;
@@ -390,7 +424,7 @@ export default function AdminMembersPage() {
   const openRenewModal = (member: CompiledMember) => {
     setSelectedMember(member);
     setRenewForm({
-      planId: member.planId,
+      planId: member.planId !== "none" ? member.planId : (gymPlans[0]?.id || "weight-training"),
       months: "3",
     });
     setModals((m) => ({ ...m, renew: true }));
@@ -401,15 +435,18 @@ export default function AdminMembersPage() {
     if (!selectedMember) return;
 
     try {
-      const plans = [
-        { id: "weight-training", name: "Weight Training", prices: { "3": 4500, "6": 6500, "12": 9000 } },
-        { id: "weight-cardio", name: "Weight Training + Cardio", prices: { "3": 5500, "6": 7500, "12": 12000 } },
-        { id: "all-in-one", name: "All In One", prices: { "3": 6500, "6": 9000, "12": 14000 } },
-      ];
+      // Use dynamic plans from Firestore
+      const selectedPlan = gymPlans.find((p) => p.id === renewForm.planId) || gymPlans[0];
+      if (!selectedPlan) {
+        showToast("No plans available to assign.", "error");
+        return;
+      }
 
-      const selectedPlan = plans.find((p) => p.id === renewForm.planId) || plans[2];
       const durationMonths = parseInt(renewForm.months);
-      const price = (selectedPlan.prices as Record<string, number>)[renewForm.months] || 6500;
+      // Scale price by duration: base price is for the plan's default duration (usually 3 months)
+      const baseDuration = parseInt(selectedPlan.duration) || 3;
+      const monthlyRate = selectedPlan.price / baseDuration;
+      const price = Math.round(monthlyRate * durationMonths);
 
       const startDate = new Date().toISOString().split("T")[0];
       const end = new Date();
@@ -430,7 +467,8 @@ export default function AdminMembersPage() {
         await setDoc(doc(db, "memberships", selectedMember.uid), updatedMembership);
         
         // Add invoice ledger record
-        const invoiceNo = `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+        const yr = new Date().getFullYear();
+        const invoiceNo = `INV-${yr}-${Math.floor(1000 + Math.random() * 9000)}`;
         await setDoc(doc(db, "payments", invoiceNo), {
           invoiceNo,
           uid: selectedMember.uid,
@@ -446,7 +484,8 @@ export default function AdminMembersPage() {
         // Local payments ledger
         const paymentsJson = localStorage.getItem("rf_payments") || "[]";
         const payments = JSON.parse(paymentsJson);
-        const invoiceNo = `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+        const yr = new Date().getFullYear();
+        const invoiceNo = `INV-${yr}-${Math.floor(1000 + Math.random() * 9000)}`;
         payments.push({
           invoiceNo,
           uid: selectedMember.uid,
@@ -459,12 +498,12 @@ export default function AdminMembersPage() {
         localStorage.setItem("rf_payments", JSON.stringify(payments));
       }
 
-      showToast(`Membership renewed to ${selectedPlan.name}!`, "success");
+      showToast(`${selectedPlan.name} plan assigned to ${selectedMember.fullName}!`, "success");
       setModals((m) => ({ ...m, renew: false }));
       loadData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to renew membership.", "error");
+      showToast("Failed to assign plan.", "error");
     }
   };
 
@@ -628,9 +667,10 @@ export default function AdminMembersPage() {
               className="h-10 text-xs px-3 bg-white/[0.02] border border-white/10 hover:border-white/20 text-white rounded-lg focus:outline-none focus:border-royal"
             >
               <option value="all" className="bg-ink-soft">All Packages</option>
-              <option value="weight-training" className="bg-ink-soft">Weight Training</option>
-              <option value="weight-cardio" className="bg-ink-soft">WT + Cardio</option>
-              <option value="all-in-one" className="bg-ink-soft">All In One</option>
+              <option value="none" className="bg-ink-soft">No Plan</option>
+              {gymPlans.map((p) => (
+                <option key={p.id} value={p.id} className="bg-ink-soft">{p.name}</option>
+              ))}
             </select>
           </div>
 
@@ -705,12 +745,18 @@ export default function AdminMembersPage() {
                         <p className="text-[10px] text-muted-foreground mt-0.5">{m.email}</p>
                       </td>
                       <td className="py-4 px-4">
-                        <p className="text-white font-medium">Expires: {m.endDate}</p>
-                        <p className={`text-[10px] font-semibold mt-0.5 ${
-                          m.daysRemaining <= 0 ? "text-rose-400" : m.daysRemaining <= 7 ? "text-amber-400" : "text-muted-foreground"
-                        }`}>
-                          {m.daysRemaining} Days remaining
-                        </p>
+                        {m.planId !== "none" && m.endDate ? (
+                          <>
+                            <p className="text-white font-medium">Expires: {m.endDate}</p>
+                            <p className={`text-[10px] font-semibold mt-0.5 ${
+                              m.daysRemaining <= 0 ? "text-rose-400" : m.daysRemaining <= 7 ? "text-amber-400" : "text-muted-foreground"
+                            }`}>
+                              {m.daysRemaining} Days remaining
+                            </p>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="py-4 px-4">
                         {m.heightCm && m.weightKg ? (
@@ -744,10 +790,10 @@ export default function AdminMembersPage() {
                           </Button>
                           <Button
                             onClick={() => openRenewModal(m)}
-                            title="Renew plan"
+                            title={m.planId === "none" ? "Assign Package" : "Change / Renew Package"}
                             className="bg-white/5 hover:bg-royal hover:text-white p-2 rounded-lg size-8 flex items-center justify-center"
                           >
-                            <RefreshCw className="size-3.5" />
+                            <Package className="size-3.5" />
                           </Button>
                           <Button
                             onClick={() => handleToggleSuspend(m)}
@@ -915,15 +961,17 @@ export default function AdminMembersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* --- RENEW PLAN MODAL --- */}
+      {/* --- ASSIGN / RENEW PLAN MODAL --- */}
       <Dialog open={modals.renew} onOpenChange={(o) => !o && setModals((m) => ({ ...m, renew: false }))}>
-        <DialogContent className="max-w-sm bg-ink-soft border-white/10 text-white rounded-2xl p-6">
+        <DialogContent className="max-w-md bg-ink-soft border-white/10 text-white rounded-2xl p-6">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold font-heading text-steel flex items-center gap-2">
-              <RefreshCw className="size-5 text-royal" /> Renew Membership
+              <Package className="size-5 text-royal" /> {selectedMember?.planId === "none" ? "Assign Package" : "Change / Renew Package"}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Select program renew settings for: {selectedMember?.fullName}.
+              {selectedMember?.planId === "none"
+                ? `Allocate a membership package for ${selectedMember?.fullName}.`
+                : `Update the package for ${selectedMember?.fullName}. Current: ${selectedMember?.planName}.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -935,30 +983,55 @@ export default function AdminMembersPage() {
                 onChange={(e) => setRenewForm({ ...renewForm, planId: e.target.value })}
                 className="h-12 w-full px-4 rounded-md bg-white/[0.02] border border-white/10 text-white focus:outline-none focus:border-royal"
               >
-                <option value="weight-training" className="bg-ink-soft">Weight Training</option>
-                <option value="weight-cardio" className="bg-ink-soft">WT + Cardio</option>
-                <option value="all-in-one" className="bg-ink-soft">All In One</option>
+                {gymPlans.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-ink-soft">
+                    {p.name} — ₹{p.price.toLocaleString("en-IN")} / {p.duration}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Duration term</label>
+              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Duration Term</label>
               <select
                 value={renewForm.months}
                 onChange={(e) => setRenewForm({ ...renewForm, months: e.target.value })}
                 className="h-12 w-full px-4 rounded-md bg-white/[0.02] border border-white/10 text-white focus:outline-none focus:border-royal"
               >
+                <option value="1" className="bg-ink-soft">1 Month</option>
                 <option value="3" className="bg-ink-soft">3 Months</option>
                 <option value="6" className="bg-ink-soft">6 Months</option>
                 <option value="12" className="bg-ink-soft">12 Months</option>
               </select>
             </div>
 
+            {/* Price Preview */}
+            {(() => {
+              const selPlan = gymPlans.find((p) => p.id === renewForm.planId);
+              if (!selPlan) return null;
+              const baseDur = parseInt(selPlan.duration) || 3;
+              const months = parseInt(renewForm.months);
+              const estPrice = Math.round((selPlan.price / baseDur) * months);
+              return (
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] uppercase text-muted-foreground font-semibold">Estimated Amount</p>
+                    <p className="text-2xl font-heading font-black text-white mt-1">₹{estPrice.toLocaleString("en-IN")}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase text-muted-foreground font-semibold">Plan</p>
+                    <p className="text-sm font-semibold text-royal-light mt-1">{selPlan.name}</p>
+                    <p className="text-xs text-muted-foreground">{months} month{months > 1 ? "s" : ""}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
             <Button
               type="submit"
-              className="w-full bg-royal hover:bg-royal-light text-white font-semibold font-heading h-12 mt-2 animate-pulse"
+              className="w-full bg-royal hover:bg-royal-light text-white font-semibold font-heading h-12 mt-2"
             >
-              Confirm Subscription Renewal
+              {selectedMember?.planId === "none" ? "Assign Package" : "Confirm Plan Change"}
             </Button>
           </form>
         </DialogContent>
