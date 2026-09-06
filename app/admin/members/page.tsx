@@ -84,6 +84,7 @@ export default function AdminMembersPage() {
   const [members, setMembers] = useState<CompiledMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [gymPlans, setGymPlans] = useState<GymPlan[]>([]); // Dynamic plans from Firestore
+  const [firestoreError, setFirestoreError] = useState<string | null>(null);
 
   // Search & Filter state
   const [search, setSearch] = useState("");
@@ -141,6 +142,7 @@ export default function AdminMembersPage() {
 
   const loadData = async () => {
     setLoading(true);
+    setFirestoreError(null);
     try {
       let uids: string[] = [];
       let rawProfiles: Record<string, any> = {};
@@ -183,8 +185,16 @@ export default function AdminMembersPage() {
           plansSnap.forEach((doc) => {
             fetchedPlans.push(doc.data() as GymPlan);
           });
-        } catch (e) {
-          console.warn("Firestore error reading members list, using localStorage fallback:", e);
+        } catch (e: any) {
+          console.error("Firestore error reading members list:", e);
+          // Check if it's a permission error specifically
+          if (e?.code === "permission-denied" || e?.message?.includes("permission")) {
+            setFirestoreError(
+              "Firestore access denied. Please update your Firestore Security Rules in Firebase Console to allow admin reads. " +
+              "Go to: Firebase Console → Firestore → Rules, and publish the rules from firestore.rules file."
+            );
+          }
+          // Still try localStorage fallback
           ({ uids, rawProfiles, rawMemberships, rawBmiHistory } = loadLocalDataFallback());
           // Load plans from localStorage fallback
           const plansJson = typeof window !== "undefined" ? localStorage.getItem("rf_plans") || "[]" : "[]";
@@ -892,6 +902,31 @@ export default function AdminMembersPage() {
 
   return (
     <div className="space-y-6">
+      {/* FIRESTORE PERMISSION ERROR BANNER */}
+      {firestoreError && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-300">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-400" />
+          <div className="flex-1 text-sm">
+            <p className="font-semibold mb-1">Firestore Access Denied — Members Not Loading</p>
+            <p className="text-amber-300/70 text-xs leading-relaxed">
+              Your Firestore Security Rules are blocking admin reads. Update them in Firebase Console to fix this.
+            </p>
+            <a
+              href="https://console.firebase.google.com/project/gym-management-968eb/firestore/databases/-default-/rules"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-2 text-xs underline underline-offset-2 text-amber-400 hover:text-amber-200 transition-colors"
+            >
+              → Open Firebase Console Rules Editor
+            </a>
+          </div>
+          <button
+            onClick={() => setFirestoreError(null)}
+            className="text-amber-400/50 hover:text-amber-200 text-xs transition-colors ml-2"
+          >✕</button>
+        </div>
+      )}
+
       {/* 1. FILTER CONTROLS BAR */}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-ink-soft/40 border border-white/5 rounded-2xl p-4">
         <div className="relative w-full md:max-w-xs">
