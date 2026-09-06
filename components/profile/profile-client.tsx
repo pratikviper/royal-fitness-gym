@@ -393,7 +393,7 @@ export function ProfileClient() {
       setLoadingData(true);
       try {
         const [p, m, b] = await Promise.all([
-          getProfileDetails(user.uid, user.email, user.displayName),
+          getProfileDetails(user.uid, user.email, user.displayName, user.phoneNumber),
           getMembershipDetails(user.uid),
           getBmiDetails(user.uid),
         ]);
@@ -483,7 +483,7 @@ export function ProfileClient() {
                   </div>
 
                   <h3 className="mt-4 text-xl font-bold font-heading text-white">{profile.fullName}</h3>
-                  <p className="text-sm text-muted-foreground">{profile.email}</p>
+                  <p className="text-sm text-muted-foreground">{profile.email || profile.phoneNumber || "Member"}</p>
 
                   <div className="mt-4 flex flex-col items-center gap-1.5 border-t border-white/5 pt-4 w-full">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Membership ID</span>
@@ -528,7 +528,7 @@ export function ProfileClient() {
                     <Mail className="size-4 text-muted-foreground" />
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground font-semibold">Registered Email</p>
-                      <p className="text-sm font-medium text-white">{profile.email}</p>
+                      <p className="text-sm font-medium text-white">{profile.email || "Not registered (Phone login)"}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 border-b border-white/5 pb-3">

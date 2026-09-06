@@ -1,14 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, ShieldAlert, X, ShieldX } from "lucide-react";
+import { 
+  Loader2, 
+  ShieldAlert, 
+  X, 
+  ShieldX, 
+  Phone, 
+  Mail, 
+  User, 
+  ArrowRight, 
+  CheckCircle2, 
+  RotateCcw,
+  Smartphone
+} from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
-import { signUpSchema, type SignUpValues } from "@/lib/validations";
+import { 
+  signUpSchema, 
+  type SignUpValues 
+} from "@/lib/validations";
 import {
   Form,
   FormControl,
@@ -19,29 +34,31 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import type { ConfirmationResult } from "firebase/auth";
 
-function GoogleIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 48 48"
-      className="size-5 shrink-0"
-    >
-      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-    </svg>
-  );
-}
+type SignUpTab = "phone" | "email";
 
 export function SignUpForm() {
-  const { user, signUp, signInWithGoogle, isMock, loading: authLoading } = useAuth();
+  const { user, signUp, sendPhoneOtp, verifyPhoneOtp, isMock, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
-  const form = useForm<SignUpValues>({
+  const [activeTab, setActiveTab] = useState<SignUpTab>("phone");
+  const [error, setError] = useState<string | null>(null);
+
+  // Phone Auth State
+  const [phoneStep, setPhoneStep] = useState<"details" | "otp">("details");
+  const [fullName, setFullName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  const otpInputRef = useRef<HTMLInputElement>(null);
+
+  // Email form
+  const emailForm = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
       name: "",
@@ -58,7 +75,24 @@ export function SignUpForm() {
     }
   }, [user, authLoading, router]);
 
-  async function onSubmit(values: SignUpValues) {
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
+  // Focus OTP input when moving to OTP step
+  useEffect(() => {
+    if (phoneStep === "otp") {
+      setTimeout(() => otpInputRef.current?.focus(), 150);
+    }
+  }, [phoneStep]);
+
+  // Handle Email submission
+  async function onEmailSubmit(values: SignUpValues) {
     setError(null);
     try {
       await signUp(values.email, values.password, values.name);
@@ -69,18 +103,70 @@ export function SignUpForm() {
     }
   }
 
-  async function handleGoogleSignUp() {
+  // Handle Send Phone OTP for Signup
+  async function handleSendOtp(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     setError(null);
-    setGoogleLoading(true);
+
+    const cleanName = fullName.trim();
+    if (!cleanName || cleanName.length < 2) {
+      setError("Please enter your full name (minimum 2 characters).");
+      return;
+    }
+
+    const cleanNumber = phoneNumber.trim();
+    if (!cleanNumber || cleanNumber.replace(/\D/g, "").length < 10) {
+      setError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+
+    setSendingOtp(true);
     try {
-      await signInWithGoogle();
+      const result = await sendPhoneOtp(cleanNumber, "signup-recaptcha-container");
+      setConfirmationResult(result);
+      setPhoneStep("otp");
+      setResendCooldown(30);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP. Please check the number and try again.");
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
+  // Handle Verify Phone OTP for Signup
+  async function handleVerifyOtp(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    setError(null);
+
+    const cleanOtp = otpCode.trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      setError("Please enter the complete 6-digit OTP code.");
+      return;
+    }
+
+    if (!confirmationResult) {
+      setError("Session expired. Please request a new OTP.");
+      setPhoneStep("details");
+      return;
+    }
+
+    setVerifyingOtp(true);
+    try {
+      await verifyPhoneOtp(confirmationResult, cleanOtp, fullName.trim());
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Google Sign-Up failed. Please try again.");
+      setError(err instanceof Error ? err.message : "Invalid or expired OTP code.");
     } finally {
-      setGoogleLoading(false);
+      setVerifyingOtp(false);
     }
+  }
+
+  // Handle Resend OTP
+  async function handleResendOtp() {
+    if (resendCooldown > 0 || sendingOtp) return;
+    setOtpCode("");
+    await handleSendOtp();
   }
 
   if (authLoading) {
@@ -93,18 +179,22 @@ export function SignUpForm() {
 
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
+      {/* Hidden container for invisible reCAPTCHA */}
+      <div id="signup-recaptcha-container" />
+
       {isMock && (
         <div className="flex items-center gap-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-400">
           <ShieldAlert className="size-5 shrink-0 text-yellow-500" />
           <div>
             <p className="font-semibold">Mock Database Mode Active</p>
             <p className="text-xs text-yellow-500/70">
-              Firebase credentials are not set. Accounts will persist locally in your browser.
+              Firebase credentials are not configured. For Phone registration, use any mobile number and OTP <b>123456</b>.
             </p>
           </div>
         </div>
       )}
 
+      {/* Error Alert */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -114,17 +204,14 @@ export function SignUpForm() {
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="relative flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 backdrop-blur-sm px-4 py-4 text-sm text-red-300 overflow-hidden"
           >
-            {/* Glow bar on left */}
             <div className="absolute left-0 top-0 h-full w-1 rounded-l-2xl bg-gradient-to-b from-red-400 to-red-600" />
-            {/* Icon */}
             <div className="mt-0.5 shrink-0 rounded-full border border-red-500/40 bg-red-500/15 p-1.5">
               <ShieldX className="size-4 text-red-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-red-300 text-xs uppercase tracking-wider mb-0.5">Sign Up Failed</p>
-              <p className="text-red-300/80 text-sm leading-snug">{error}</p>
+              <p className="font-semibold text-red-300 text-xs uppercase tracking-wider mb-0.5">Registration Notice</p>
+              <p className="text-red-300/90 text-sm leading-snug">{error}</p>
             </div>
-            {/* Dismiss button */}
             <button
               onClick={() => setError(null)}
               className="shrink-0 mt-0.5 rounded-full p-1 text-red-400/60 hover:text-red-300 hover:bg-red-500/20 transition-colors"
@@ -136,111 +223,287 @@ export function SignUpForm() {
         )}
       </AnimatePresence>
 
-      {/* Google Sign-Up Button */}
-      {!isMock && (
+      {/* Segmented Tab Switcher */}
+      <div className="grid grid-cols-2 p-1.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
         <button
           type="button"
-          onClick={handleGoogleSignUp}
-          disabled={googleLoading}
-          className="glass w-full flex items-center justify-center gap-3 rounded-2xl px-5 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-white/10 hover:border-white/20 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
+          onClick={() => {
+            setActiveTab("phone");
+            setError(null);
+          }}
+          className={`relative flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+            activeTab === "phone"
+              ? "bg-royal text-white shadow-lg shadow-royal/30"
+              : "text-muted-foreground hover:text-white"
+          }`}
         >
-          {googleLoading ? (
-            <Loader2 className="size-5 animate-spin" />
-          ) : (
-            <GoogleIcon />
-          )}
-          <span>{googleLoading ? "Signing up with Google..." : "Sign Up with Google"}</span>
+          <Phone className="size-4" />
+          <span>Mobile Phone</span>
         </button>
-      )}
 
-      {/* Divider */}
-      {!isMock && (
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-border" />
-          <span className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">or</span>
-          <div className="h-px flex-1 bg-border" />
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("email");
+            setError(null);
+          }}
+          className={`relative flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+            activeTab === "email"
+              ? "bg-royal text-white shadow-lg shadow-royal/30"
+              : "text-muted-foreground hover:text-white"
+          }`}
+        >
+          <Mail className="size-4" />
+          <span>Email & Password</span>
+        </button>
+      </div>
+
+      {/* ── TAB 1: PHONE SIGN UP ── */}
+      {activeTab === "phone" && (
+        <div className="glass space-y-5 rounded-2xl p-6 md:p-8">
+          <AnimatePresence mode="wait">
+            {phoneStep === "details" ? (
+              <motion.form
+                key="step-details"
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 16 }}
+                transition={{ duration: 0.25 }}
+                onSubmit={handleSendOtp}
+                className="space-y-5"
+              >
+                {/* Full Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+                    <User className="size-3.5 text-royal" /> Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="John Doe"
+                    className="w-full h-11 rounded-xl bg-white/5 border border-white/10 px-4 text-sm text-white placeholder:text-muted-foreground outline-none focus:border-royal transition-colors font-medium"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Mobile Number */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+                      <Smartphone className="size-3.5 text-royal" /> Mobile Phone Number
+                    </label>
+                    <span className="text-[11px] text-muted-foreground">Country: India (+91)</span>
+                  </div>
+
+                  <div className="flex items-center rounded-xl bg-white/5 border border-white/10 focus-within:border-royal transition-colors overflow-hidden">
+                    <div className="flex items-center gap-1 px-3.5 py-3 border-r border-white/10 bg-white/[0.03] text-sm font-medium text-white select-none">
+                      <span className="text-base">🇮🇳</span>
+                      <span className="text-xs text-muted-foreground font-mono">+91</span>
+                    </div>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="98765 43210"
+                      className="w-full bg-transparent px-3.5 py-3 text-sm text-white placeholder:text-muted-foreground outline-none font-medium"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    We will send a 6-digit SMS verification code to this mobile number.
+                  </p>
+                </div>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full bg-royal hover:bg-royal-light text-white font-bold tracking-wide"
+                  disabled={sendingOtp || !fullName.trim() || !phoneNumber.trim()}
+                >
+                  {sendingOtp ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin mr-2" />
+                      Sending OTP SMS...
+                    </>
+                  ) : (
+                    <>
+                      Send Verification Code <ArrowRight className="size-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </motion.form>
+            ) : (
+              <motion.form
+                key="step-otp"
+                initial={{ opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -16 }}
+                transition={{ duration: 0.25 }}
+                onSubmit={handleVerifyOtp}
+                className="space-y-5"
+              >
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold block">
+                      Code Sent To
+                    </span>
+                    <span className="text-sm font-bold text-white font-mono">
+                      {phoneNumber.startsWith("+") ? phoneNumber : `+91 ${phoneNumber}`}
+                    </span>
+                    <span className="text-xs text-muted-foreground block mt-0.5">
+                      Name: <b className="text-white">{fullName}</b>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoneStep("details");
+                      setError(null);
+                    }}
+                    className="text-xs text-royal hover:text-royal-light hover:underline font-semibold"
+                  >
+                    Change Details
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="size-3.5 text-royal" /> Enter 6-Digit OTP Code
+                  </label>
+                  <input
+                    ref={otpInputRef}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                    placeholder="••••••"
+                    className="w-full h-14 rounded-xl bg-white/5 border border-white/10 px-4 text-center font-mono text-2xl font-bold tracking-[0.5em] text-white placeholder:text-muted-foreground outline-none focus:border-royal transition-colors"
+                  />
+                  <div className="flex items-center justify-between pt-1 text-xs">
+                    <span className="text-muted-foreground">Didn&apos;t receive SMS?</span>
+                    {resendCooldown > 0 ? (
+                      <span className="text-muted-foreground font-mono">
+                        Resend in <b className="text-white">{resendCooldown}s</b>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        disabled={sendingOtp}
+                        className="text-royal hover:text-royal-light font-semibold inline-flex items-center gap-1"
+                      >
+                        <RotateCcw className="size-3" /> Resend OTP
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full bg-royal hover:bg-royal-light text-white font-bold tracking-wide"
+                  disabled={verifyingOtp || otpCode.length !== 6}
+                >
+                  {verifyingOtp ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin mr-2" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    "Verify & Complete Registration"
+                  )}
+                </Button>
+              </motion.form>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="glass space-y-5 rounded-2xl p-6 md:p-8"
-          noValidate
-        >
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Full Name</FormLabel>
-                <FormControl>
-                  <Input placeholder="John Doe" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email Address</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="you@example.com" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="••••••••" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirm Password</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="••••••••" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full"
-            disabled={form.formState.isSubmitting}
+      {/* ── TAB 2: EMAIL & PASSWORD SIGN UP ── */}
+      {activeTab === "email" && (
+        <Form {...emailForm}>
+          <form
+            onSubmit={emailForm.handleSubmit(onEmailSubmit)}
+            className="glass space-y-5 rounded-2xl p-6 md:p-8"
+            noValidate
           >
-            {form.formState.isSubmitting ? (
-              <>
-                <Loader2 className="size-4 animate-spin mr-2" /> Creating Account...
-              </>
-            ) : (
-              "Sign Up"
-            )}
-          </Button>
-        </form>
-      </Form>
+            <FormField
+              control={emailForm.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="John Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
+            <FormField
+              control={emailForm.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email Address</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="you@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={emailForm.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={emailForm.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full bg-royal hover:bg-royal-light text-white font-bold"
+              disabled={emailForm.formState.isSubmitting}
+            >
+              {emailForm.formState.isSubmitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin mr-2" /> Creating Account...
+                </>
+              ) : (
+                "Sign Up with Email"
+              )}
+            </Button>
+          </form>
+        </Form>
+      )}
+
+      {/* Link to Login */}
       <div className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
         <Link href="/login" className="font-semibold text-royal hover:underline">
@@ -250,3 +513,4 @@ export function SignUpForm() {
     </div>
   );
 }
+

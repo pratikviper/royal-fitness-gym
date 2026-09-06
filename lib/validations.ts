@@ -105,3 +105,34 @@ export const signUpSchema = z
 
 export type SignUpValues = z.infer<typeof signUpSchema>;
 
+/** Phone login schema */
+export const phoneLoginSchema = z.object({
+  phone: z
+    .string()
+    .min(10, "Please enter at least 10 digits for your mobile number.")
+    .regex(/^[+\d\s()-]{10,16}$/, "Please enter a valid phone number."),
+});
+
+export type PhoneLoginValues = z.infer<typeof phoneLoginSchema>;
+
+/** Phone signup schema */
+export const phoneSignUpSchema = z.object({
+  name: z.string().min(2, "Please enter your full name (minimum 2 characters)."),
+  phone: z
+    .string()
+    .min(10, "Please enter at least 10 digits for your mobile number.")
+    .regex(/^[+\d\s()-]{10,16}$/, "Please enter a valid phone number."),
+});
+
+export type PhoneSignUpValues = z.infer<typeof phoneSignUpSchema>;
+
+/** OTP code schema */
+export const otpSchema = z.object({
+  otp: z
+    .string()
+    .length(6, "OTP must be exactly 6 digits.")
+    .regex(/^\d{6}$/, "OTP must contain only numbers."),
+});
+
+export type OtpValues = z.infer<typeof otpSchema>;
+

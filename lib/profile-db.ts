@@ -60,12 +60,17 @@ const generateMembershipId = () => {
   return `RF-${Math.floor(10000 + Math.random() * 90000)}`;
 };
 
-export function getDefaultProfile(uid: string, email: string | null, displayName: string | null): UserProfileDetails {
+export function getDefaultProfile(
+  uid: string, 
+  email: string | null, 
+  displayName: string | null,
+  phoneNumber?: string | null
+): UserProfileDetails {
   return {
     uid,
     fullName: displayName || "Elite Member",
-    email: email || "member@royalfitness.com",
-    phoneNumber: "+91 98765 43210",
+    email: email || "",
+    phoneNumber: phoneNumber || "",
     joiningDate: new Date().toISOString().split("T")[0],
     membershipId: generateMembershipId(),
     photoURL: null,
@@ -101,7 +106,8 @@ export function getDefaultBmi(): UserBmiDetails {
 export async function getProfileDetails(
   uid: string,
   email: string | null = null,
-  displayName: string | null = null
+  displayName: string | null = null,
+  phoneNumber: string | null = null
 ): Promise<UserProfileDetails> {
   // If Firestore is available, try fetching
   if (db) {
@@ -109,10 +115,30 @@ export async function getProfileDetails(
       const docRef = doc(db, "users", uid);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        return docSnap.data() as UserProfileDetails;
+        const existingData = docSnap.data() as UserProfileDetails;
+        let needsUpdate = false;
+        const updates: Partial<UserProfileDetails> = {};
+        
+        if (phoneNumber && (!existingData.phoneNumber || existingData.phoneNumber === "+91 98765 43210")) {
+          updates.phoneNumber = phoneNumber;
+          needsUpdate = true;
+        }
+        if (displayName && (existingData.fullName === "Elite Member" || !existingData.fullName)) {
+          updates.fullName = displayName;
+          needsUpdate = true;
+        }
+        if (email && (!existingData.email || existingData.email === "member@royalfitness.com")) {
+          updates.email = email;
+          needsUpdate = true;
+        }
+        if (needsUpdate) {
+          await setDoc(docRef, updates, { merge: true });
+          return { ...existingData, ...updates };
+        }
+        return existingData;
       } else {
         // Document does not exist yet, seed in Firestore
-        const defaultProfile = getDefaultProfile(uid, email, displayName);
+        const defaultProfile = getDefaultProfile(uid, email, displayName, phoneNumber);
         await setDoc(docRef, defaultProfile);
         return defaultProfile;
       }
@@ -126,18 +152,23 @@ export async function getProfileDetails(
     const cached = localStorage.getItem(`rf_profile_${uid}`);
     if (cached) {
       try {
-        return JSON.parse(cached) as UserProfileDetails;
+        const existing = JSON.parse(cached) as UserProfileDetails;
+        if (phoneNumber && !existing.phoneNumber) {
+          existing.phoneNumber = phoneNumber;
+          localStorage.setItem(`rf_profile_${uid}`, JSON.stringify(existing));
+        }
+        return existing;
       } catch {
         // Ignore JSON error
       }
     }
     // Seed new profile in localStorage
-    const defaultProfile = getDefaultProfile(uid, email, displayName);
+    const defaultProfile = getDefaultProfile(uid, email, displayName, phoneNumber);
     localStorage.setItem(`rf_profile_${uid}`, JSON.stringify(defaultProfile));
     return defaultProfile;
   }
 
-  return getDefaultProfile(uid, email, displayName);
+  return getDefaultProfile(uid, email, displayName, phoneNumber);
 }
 
 /** 2. FETCH MEMBERSHIP DETAILS */
