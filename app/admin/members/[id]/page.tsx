@@ -92,6 +92,36 @@ export default function MemberProfilePage({ params }: { params: Promise<{ id: st
             }
           });
 
+          // Also check direct BMI document
+          try {
+            const directBmiSnap = await getDoc(doc(db, "bmi", memberId));
+            if (directBmiSnap.exists()) {
+              const dData = directBmiSnap.data();
+              if (!bLogs.some((l) => l.calculatedAt === dData.calculatedAt)) {
+                bLogs.push(dData);
+              }
+            }
+          } catch {}
+
+          // If still empty, check if profile has height & weight
+          if (bLogs.length === 0 && p && p.heightCm && p.weightKg) {
+            const hm = p.heightCm / 100;
+            const score = p.bmiScore || Math.round((p.weightKg / (hm * hm)) * 10) / 10;
+            let cat = "Normal";
+            if (score < 18.5) cat = "Underweight";
+            else if (score < 25) cat = "Normal";
+            else if (score < 30) cat = "Overweight";
+            else cat = "Obese";
+
+            bLogs.push({
+              heightCm: p.heightCm,
+              weightKg: p.weightKg,
+              bmiScore: score,
+              category: cat,
+              calculatedAt: p.joiningDate || new Date().toISOString().split("T")[0]
+            });
+          }
+
           // Fetch Payments
           const paymentsSnap = await getDocs(collection(db, "payments"));
           paymentsSnap.forEach((doc) => {

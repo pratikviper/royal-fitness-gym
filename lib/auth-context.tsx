@@ -11,6 +11,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { auth } from "@/lib/auth";
+import { getProfileDetails } from "@/lib/profile-db";
 
 export interface User {
   uid: string;
@@ -129,6 +130,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const fbUser = userCredential.user;
         
         await updateProfile(fbUser, { displayName: name });
+        try {
+          await getProfileDetails(fbUser.uid, fbUser.email, name);
+        } catch (e) {
+          console.warn("Failed to initialize user document:", e);
+        }
         
         setUser({
           uid: fbUser.uid,
@@ -198,6 +204,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider.setCustomParameters({ prompt: "select_account" });
       const result = await signInWithPopup(auth, provider);
       const fbUser = result.user;
+      try {
+        await getProfileDetails(fbUser.uid, fbUser.email, fbUser.displayName);
+      } catch (e) {
+        console.warn("Failed to initialize user document on Google sign-in:", e);
+      }
       setUser({
         uid: fbUser.uid,
         email: fbUser.email,

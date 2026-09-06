@@ -53,8 +53,10 @@ export default function AdminAttendancePage() {
           const usersSnap = await getDocs(collection(db, "users"));
           usersSnap.forEach((doc) => {
             const data = doc.data();
-            if (data.role === "member") {
-              members.push(doc.data());
+            const email = (data.email || "").toLowerCase();
+            const isUserAdmin = data.role === "admin" || email === "admin@royalfitness.com";
+            if (!isUserAdmin) {
+              members.push({ uid: doc.id, ...data });
             }
           });
 
@@ -154,6 +156,38 @@ export default function AdminAttendancePage() {
     } catch (err) {
       console.error(err);
       showToast("Failed to record attendance.", "error");
+    }
+  };
+
+  const handleMarkAllPresent = async () => {
+    if (attendance.length === 0) return;
+    try {
+      setLoading(true);
+      if (db) {
+        for (const m of attendance) {
+          const attId = `${m.uid}_${selectedDate}`;
+          await setDoc(doc(db, "attendance", attId), {
+            uid: m.uid,
+            date: selectedDate,
+            status: "Present"
+          });
+        }
+      } else {
+        const cached = localStorage.getItem("rf_attendance") || "[]";
+        let logs = JSON.parse(cached) as any[];
+        logs = logs.filter((l) => l.date !== selectedDate);
+        attendance.forEach((m) => {
+          logs.push({ uid: m.uid, date: selectedDate, status: "Present" });
+        });
+        localStorage.setItem("rf_attendance", JSON.stringify(logs));
+      }
+
+      showToast(`All members marked Present for ${selectedDate}!`, "success");
+      loadAttendanceData();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to mark all present.", "error");
+      setLoading(false);
     }
   };
 
@@ -257,6 +291,13 @@ export default function AdminAttendancePage() {
             onChange={(e) => setSelectedDate(e.target.value)}
             className="border-white/10 text-white w-full md:w-56 focus-visible:border-royal bg-white/[0.01]"
           />
+          <Button
+            onClick={handleMarkAllPresent}
+            variant="outline"
+            className="border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-400 text-xs h-10 font-semibold flex items-center gap-1.5 shrink-0"
+          >
+            <CheckCircle className="size-3.5" /> Mark All Present
+          </Button>
         </div>
 
         <div className="relative w-full md:max-w-xs">

@@ -9,7 +9,8 @@ import {
   FileText, 
   Printer, 
   Loader2, 
-  Search
+  Search,
+  Plus
 } from "lucide-react";
 import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -41,6 +42,7 @@ interface GymPayment {
 export default function AdminPaymentsPage() {
   const { showToast } = useToast();
   const [payments, setPayments] = useState<GymPayment[]>([]);
+  const [allMembers, setAllMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // States for search and tabs
@@ -51,19 +53,38 @@ export default function AdminPaymentsPage() {
   const [selectedReceipt, setSelectedReceipt] = useState<GymPayment | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
 
+  // New Payment Modal
+  const [recordModalOpen, setRecordModalOpen] = useState(false);
+  const [newPaymentForm, setNewPaymentForm] = useState({
+    uid: "",
+    planName: "Weight Training",
+    amount: "4500",
+    method: "UPI",
+    status: "Paid" as "Paid" | "Pending",
+    date: new Date().toISOString().split("T")[0]
+  });
+
   const loadPayments = async () => {
     setLoading(true);
     try {
       let tempPayments: GymPayment[] = [];
       const profiles: Record<string, any> = {};
+      const memberList: any[] = [];
 
       if (db) {
         try {
           // Fetch profiles first for name mapping
           const usersSnap = await getDocs(collection(db, "users"));
           usersSnap.forEach((doc) => {
-            profiles[doc.id] = doc.data();
+            const d = doc.data();
+            profiles[doc.id] = d;
+            const email = (d.email || "").toLowerCase();
+            const isUserAdmin = d.role === "admin" || email === "admin@royalfitness.com";
+            if (!isUserAdmin) {
+              memberList.push({ uid: doc.id, ...d });
+            }
           });
+          setAllMembers(memberList);
 
           // Fetch payments
           const snap = await getDocs(collection(db, "payments"));
@@ -164,6 +185,63 @@ export default function AdminPaymentsPage() {
     } catch (err) {
       console.error(err);
       showToast("Failed to update invoice status.", "error");
+    }
+  };
+
+  const openRecordModal = () => {
+    setNewPaymentForm({
+      uid: allMembers[0]?.uid || "",
+      planName: "Gym Membership Plan",
+      amount: "4500",
+      method: "UPI",
+      status: "Paid",
+      date: new Date().toISOString().split("T")[0]
+    });
+    setRecordModalOpen(true);
+  };
+
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPaymentForm.uid) {
+      showToast("Please select a member.", "error");
+      return;
+    }
+
+    const amt = parseFloat(newPaymentForm.amount) || 0;
+    const invId = `INV-${Date.now().toString().slice(-6)}`;
+    const payDate = newPaymentForm.date || new Date().toISOString().split("T")[0];
+
+    try {
+      if (db) {
+        await setDoc(doc(db, "payments", invId), {
+          uid: newPaymentForm.uid,
+          planName: newPaymentForm.planName,
+          amount: amt,
+          method: newPaymentForm.method,
+          status: newPaymentForm.status,
+          date: payDate
+        });
+      } else {
+        const cached = localStorage.getItem("rf_payments") || "[]";
+        const list = JSON.parse(cached);
+        list.push({
+          invoiceNo: invId,
+          uid: newPaymentForm.uid,
+          planName: newPaymentForm.planName,
+          amount: amt,
+          method: newPaymentForm.method,
+          status: newPaymentForm.status,
+          date: payDate
+        });
+        localStorage.setItem("rf_payments", JSON.stringify(list));
+      }
+
+      showToast(`Invoice ${invId} recorded successfully!`, "success");
+      setRecordModalOpen(false);
+      loadPayments();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to record payment.", "error");
     }
   };
 
@@ -291,14 +369,23 @@ export default function AdminPaymentsPage() {
           ))}
         </div>
 
-        <div className="relative w-full md:max-w-xs">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-            placeholder="Search invoice or member..."
-            className="pl-10 border-white/5 focus-visible:border-royal bg-white/[0.01]"
-          />
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          <div className="relative w-full md:max-w-xs">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+              placeholder="Search invoice or member..."
+              className="pl-10 border-white/5 focus-visible:border-royal bg-white/[0.01]"
+            />
+          </div>
+
+          <Button 
+            onClick={openRecordModal}
+            className="h-10 bg-royal hover:bg-royal-dark text-white rounded-lg font-heading font-semibold flex items-center gap-1.5 px-4 text-xs shrink-0 shadow-lg shadow-royal/20 w-full sm:w-auto justify-center"
+          >
+            <Plus className="size-3.5" /> Record Payment
+          </Button>
         </div>
       </div>
 
@@ -443,6 +530,108 @@ export default function AdminPaymentsPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* --- RECORD NEW PAYMENT MODAL --- */}
+      <Dialog open={recordModalOpen} onOpenChange={(o) => !o && setRecordModalOpen(false)}>
+        <DialogContent className="max-w-md bg-ink-soft border-white/10 text-white rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold font-heading text-steel flex items-center gap-2">
+              <DollarSign className="size-5 text-royal" /> Record Offline Payment
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Add a payment transaction manually for subscription or renewal fees.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleRecordPaymentSubmit} className="mt-4 space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Select Member *</label>
+              <select
+                value={newPaymentForm.uid}
+                onChange={(e) => setNewPaymentForm({ ...newPaymentForm, uid: e.target.value })}
+                required
+                className="h-11 w-full px-3 rounded-md bg-white/[0.02] border border-white/10 text-white text-xs focus:outline-none focus:border-royal"
+              >
+                <option value="" disabled className="bg-ink-soft">Choose a member</option>
+                {allMembers.map((m) => (
+                  <option key={m.uid} value={m.uid} className="bg-ink-soft">
+                    {m.fullName || "Member"} ({m.membershipId || `RF-${m.uid.slice(0,5)}`})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Description / Plan</label>
+              <Input
+                value={newPaymentForm.planName}
+                onChange={(e) => setNewPaymentForm({ ...newPaymentForm, planName: e.target.value })}
+                placeholder="e.g. Weight Training (3 Months)"
+                required
+                className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Amount (₹) *</label>
+                <Input
+                  type="number"
+                  value={newPaymentForm.amount}
+                  onChange={(e) => setNewPaymentForm({ ...newPaymentForm, amount: e.target.value })}
+                  placeholder="4500"
+                  required
+                  className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Date</label>
+                <Input
+                  type="date"
+                  value={newPaymentForm.date}
+                  onChange={(e) => setNewPaymentForm({ ...newPaymentForm, date: e.target.value })}
+                  required
+                  className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Payment Mode</label>
+                <select
+                  value={newPaymentForm.method}
+                  onChange={(e) => setNewPaymentForm({ ...newPaymentForm, method: e.target.value })}
+                  className="h-10 w-full px-3 rounded-md bg-white/[0.02] border border-white/10 text-white text-xs focus:outline-none focus:border-royal"
+                >
+                  <option value="UPI" className="bg-ink-soft">UPI / GPay / PhonePe</option>
+                  <option value="Cash" className="bg-ink-soft">Cash</option>
+                  <option value="Credit/Debit Card" className="bg-ink-soft">Credit / Debit Card</option>
+                  <option value="Net Banking" className="bg-ink-soft">Net Banking</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Status</label>
+                <select
+                  value={newPaymentForm.status}
+                  onChange={(e) => setNewPaymentForm({ ...newPaymentForm, status: e.target.value as "Paid" | "Pending" })}
+                  className="h-10 w-full px-3 rounded-md bg-white/[0.02] border border-white/10 text-white text-xs focus:outline-none focus:border-royal"
+                >
+                  <option value="Paid" className="bg-ink-soft">Paid</option>
+                  <option value="Pending" className="bg-ink-soft">Pending</option>
+                </select>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-royal hover:bg-royal-light text-white font-semibold font-heading h-12 mt-2"
+            >
+              Save Payment & Generate Invoice
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

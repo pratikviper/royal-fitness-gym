@@ -86,10 +86,12 @@ export default function AdminTrainersPage() {
           const mSnap = await getDocs(collection(db, "users"));
           mSnap.forEach((doc) => {
             const data = doc.data();
-            if (data.role === "member") {
+            const email = (data.email || "").toLowerCase();
+            const isUserAdmin = data.role === "admin" || email === "admin@royalfitness.com";
+            if (!isUserAdmin) {
               tempMembers.push({
                 uid: doc.id,
-                fullName: data.fullName,
+                fullName: data.fullName || "Member",
                 membershipId: data.membershipId || `RF-${doc.id.slice(0, 5)}`,
                 photoURL: data.photoURL,
                 trainerId: data.trainerId,

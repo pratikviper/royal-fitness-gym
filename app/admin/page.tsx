@@ -92,7 +92,8 @@ export default function AdminDashboardPage() {
             const usersSnap = await getDocs(collection(db, "users"));
             usersSnap.forEach((doc) => {
               const u = doc.data();
-              if (u.role === "member") {
+              const isUserAdmin = u.role === "admin" || u.email?.toLowerCase() === "admin@royalfitness.com";
+              if (!isUserAdmin) {
                 members.push(u);
               }
             });

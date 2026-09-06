@@ -60,16 +60,17 @@ const generateMembershipId = () => {
   return `RF-${Math.floor(10000 + Math.random() * 90000)}`;
 };
 
-/** Get default profile details */
 export function getDefaultProfile(uid: string, email: string | null, displayName: string | null): UserProfileDetails {
   return {
     uid,
     fullName: displayName || "Elite Member",
     email: email || "member@royalfitness.com",
     phoneNumber: "+91 98765 43210",
-    joiningDate: getPastDateStr(45), // Joined 45 days ago
+    joiningDate: new Date().toISOString().split("T")[0],
     membershipId: generateMembershipId(),
     photoURL: null,
+    role: "member",
+    status: "Active",
   };
 }
 
@@ -245,25 +246,45 @@ export async function updateProfileDetails(
   return updated;
 }
 
-/** 5. CALCULATE & SAVE BMI DETAILS */
 export async function updateBmiDetails(
   uid: string,
   heightCm: number,
   weightKg: number
 ): Promise<UserBmiDetails> {
   const result = calculateBmi(heightCm, weightKg);
+  const todayStr = new Date().toISOString().split("T")[0];
   const updated: UserBmiDetails = {
     weightKg,
     heightCm,
-    calculatedAt: new Date().toISOString().split("T")[0],
+    calculatedAt: todayStr,
     bmiScore: result.bmi,
     category: result.category,
   };
 
   if (db) {
     try {
+      // 1. Write to bmi document
       const docRef = doc(db, "bmi", uid);
       await setDoc(docRef, updated);
+
+      // 2. Also log entry to bmi_reports for historical progression
+      const reportId = `${uid}_${Date.now()}`;
+      await setDoc(doc(db, "bmi_reports", reportId), {
+        uid,
+        weightKg,
+        heightCm,
+        bmiScore: result.bmi,
+        category: result.category,
+        calculatedAt: todayStr,
+      });
+
+      // 3. Update user profile document
+      const userRef = doc(db, "users", uid);
+      await setDoc(userRef, {
+        heightCm,
+        weightKg,
+        bmiScore: result.bmi
+      }, { merge: true });
     } catch (e) {
       console.error("Error writing BMI to Firestore:", e);
     }
@@ -271,6 +292,31 @@ export async function updateBmiDetails(
 
   if (isBrowser) {
     localStorage.setItem(`rf_bmi_${uid}`, JSON.stringify(updated));
+
+    // Update history array
+    const historyJson = localStorage.getItem(`rf_bmi_history_${uid}`) || "[]";
+    const history = JSON.parse(historyJson);
+    history.push({
+      uid,
+      weightKg,
+      heightCm,
+      bmiScore: result.bmi,
+      category: result.category,
+      calculatedAt: todayStr,
+    });
+    localStorage.setItem(`rf_bmi_history_${uid}`, JSON.stringify(history));
+
+    // Also update cached profile
+    const cachedProfile = localStorage.getItem(`rf_profile_${uid}`);
+    if (cachedProfile) {
+      try {
+        const prof = JSON.parse(cachedProfile);
+        prof.heightCm = heightCm;
+        prof.weightKg = weightKg;
+        prof.bmiScore = result.bmi;
+        localStorage.setItem(`rf_profile_${uid}`, JSON.stringify(prof));
+      } catch {}
+    }
   }
 
   return updated;

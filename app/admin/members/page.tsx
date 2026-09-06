@@ -98,10 +98,28 @@ export default function AdminMembersPage() {
   // Modals state
   const [selectedMember, setSelectedMember] = useState<CompiledMember | null>(null);
   const [modals, setModals] = useState({
+    create: false,
     edit: false,
     renew: false,
     suspend: false,
     delete: false,
+  });
+
+  // New member registration form state
+  const [newMemberForm, setNewMemberForm] = useState({
+    fullName: "",
+    email: "",
+    phoneNumber: "",
+    gender: "Male",
+    age: "24",
+    planId: "weight-training",
+    durationMonths: "3",
+    pricePaid: "4500",
+    paymentMethod: "UPI",
+    paymentStatus: "Paid",
+    joiningDate: new Date().toISOString().split("T")[0],
+    heightCm: "",
+    weightKg: "",
   });
 
   // Edit form states
@@ -136,7 +154,9 @@ export default function AdminMembersPage() {
           const usersSnap = await getDocs(collection(db, "users"));
           usersSnap.forEach((doc) => {
             const data = doc.data();
-            if (data.role === "member") {
+            const email = (data.email || "").toLowerCase();
+            const isUserAdmin = data.role === "admin" || email === "admin@royalfitness.com";
+            if (!isUserAdmin) {
               uids.push(doc.id);
               rawProfiles[doc.id] = data;
             }
@@ -306,6 +326,174 @@ export default function AdminMembersPage() {
     const d = new Date();
     d.setDate(d.getDate() + daysAhead);
     return d.toISOString().split("T")[0];
+  };
+
+  // Open Create Member modal
+  const openCreateModal = () => {
+    const defaultPlan = gymPlans[0] || { id: "weight-training", price: 4500, duration: "3 Months" };
+    setNewMemberForm({
+      fullName: "",
+      email: "",
+      phoneNumber: "",
+      gender: "Male",
+      age: "24",
+      planId: defaultPlan.id,
+      durationMonths: "3",
+      pricePaid: defaultPlan.price ? defaultPlan.price.toString() : "4500",
+      paymentMethod: "UPI",
+      paymentStatus: "Paid",
+      joiningDate: new Date().toISOString().split("T")[0],
+      heightCm: "",
+      weightKg: "",
+    });
+    setModals((m) => ({ ...m, create: true }));
+  };
+
+  const handleCreateMemberSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const uid = `member_${Date.now()}`;
+      const membershipId = `RF-${Math.floor(10000 + Math.random() * 90000)}`;
+      const joiningDate = newMemberForm.joiningDate || new Date().toISOString().split("T")[0];
+      const durationMonths = parseInt(newMemberForm.durationMonths) || 3;
+      const pricePaid = parseFloat(newMemberForm.pricePaid) || 0;
+      
+      const startDate = joiningDate;
+      const endD = new Date(startDate);
+      endD.setMonth(endD.getMonth() + durationMonths);
+      const endDate = endD.toISOString().split("T")[0];
+
+      const chosenPlan = gymPlans.find((p) => p.id === newMemberForm.planId) || { name: "Weight Training" };
+
+      const parsedHeight = parseFloat(newMemberForm.heightCm) || 0;
+      const parsedWeight = parseFloat(newMemberForm.weightKg) || 0;
+      let bmiScore = 0;
+      if (parsedHeight > 0 && parsedWeight > 0) {
+        const hm = parsedHeight / 100;
+        bmiScore = Math.round((parsedWeight / (hm * hm)) * 10) / 10;
+      }
+
+      const userProfile: UserProfileDetails = {
+        uid,
+        fullName: newMemberForm.fullName,
+        email: newMemberForm.email,
+        phoneNumber: newMemberForm.phoneNumber,
+        joiningDate,
+        membershipId,
+        gender: newMemberForm.gender,
+        age: parseInt(newMemberForm.age) || 24,
+        photoURL: null,
+        role: "member",
+        status: "Active",
+        ...(parsedHeight > 0 && { heightCm: parsedHeight }),
+        ...(parsedWeight > 0 && { weightKg: parsedWeight }),
+        ...(bmiScore > 0 && { bmiScore })
+      };
+
+      const userMembership: UserMembership = {
+        planId: newMemberForm.planId,
+        planName: chosenPlan.name,
+        startDate,
+        endDate,
+        durationMonths,
+        pricePaid,
+        status: "Active"
+      };
+
+      if (db) {
+        // 1. Write user profile
+        await setDoc(doc(db, "users", uid), userProfile);
+        // 2. Write membership
+        await setDoc(doc(db, "memberships", uid), userMembership);
+        // 3. Write payment
+        if (pricePaid > 0) {
+          const invId = `INV-${Date.now().toString().slice(-6)}`;
+          await setDoc(doc(db, "payments", invId), {
+            uid,
+            planName: chosenPlan.name,
+            amount: pricePaid,
+            method: newMemberForm.paymentMethod,
+            status: newMemberForm.paymentStatus,
+            date: joiningDate
+          });
+        }
+        // 4. Write BMI record if entered
+        if (bmiScore > 0) {
+          let category: "Underweight" | "Normal" | "Overweight" | "Obese" = "Normal";
+          if (bmiScore < 18.5) category = "Underweight";
+          else if (bmiScore < 25) category = "Normal";
+          else if (bmiScore < 30) category = "Overweight";
+          else category = "Obese";
+
+          await setDoc(doc(db, "bmi", uid), {
+            uid,
+            heightCm: parsedHeight,
+            weightKg: parsedWeight,
+            bmiScore,
+            category,
+            calculatedAt: joiningDate
+          });
+
+          await setDoc(doc(db, "bmi_reports", `${uid}_${joiningDate}`), {
+            uid,
+            heightCm: parsedHeight,
+            weightKg: parsedWeight,
+            bmiScore,
+            category,
+            calculatedAt: joiningDate
+          });
+        }
+      } else {
+        // LocalStorage fallback
+        const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
+        const uids = JSON.parse(uidsJson) as string[];
+        uids.push(uid);
+        localStorage.setItem("rf_member_uids", JSON.stringify(uids));
+
+        localStorage.setItem(`rf_profile_${uid}`, JSON.stringify(userProfile));
+        localStorage.setItem(`rf_membership_${uid}`, JSON.stringify(userMembership));
+
+        if (pricePaid > 0) {
+          const payments = JSON.parse(localStorage.getItem("rf_payments") || "[]");
+          payments.push({
+            invoiceNo: `INV-${Date.now().toString().slice(-6)}`,
+            uid,
+            planName: chosenPlan.name,
+            amount: pricePaid,
+            method: newMemberForm.paymentMethod,
+            status: newMemberForm.paymentStatus,
+            date: joiningDate
+          });
+          localStorage.setItem("rf_payments", JSON.stringify(payments));
+        }
+
+        if (bmiScore > 0) {
+          let category = "Normal";
+          if (bmiScore < 18.5) category = "Underweight";
+          else if (bmiScore < 25) category = "Normal";
+          else if (bmiScore < 30) category = "Overweight";
+          else category = "Obese";
+
+          const bmiObj = {
+            uid,
+            heightCm: parsedHeight,
+            weightKg: parsedWeight,
+            bmiScore,
+            category,
+            calculatedAt: joiningDate
+          };
+          localStorage.setItem(`rf_bmi_${uid}`, JSON.stringify(bmiObj));
+          localStorage.setItem(`rf_bmi_history_${uid}`, JSON.stringify([bmiObj]));
+        }
+      }
+
+      showToast(`Member ${newMemberForm.fullName} registered successfully!`, "success");
+      setModals((m) => ({ ...m, create: false }));
+      loadData();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to register member.", "error");
+    }
   };
 
   // Trigger actions
@@ -756,6 +944,13 @@ export default function AdminMembersPage() {
           </select>
 
           <Button 
+            onClick={openCreateModal}
+            className="h-10 bg-royal hover:bg-royal-dark text-white rounded-lg font-heading font-semibold flex items-center gap-1.5 px-4 text-xs shadow-lg shadow-royal/20"
+          >
+            <UserPlus className="size-3.5" /> Add Member
+          </Button>
+
+          <Button 
             onClick={exportToCSV}
             className="h-10 border border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-lg font-heading font-semibold flex items-center gap-1.5 px-4 text-xs"
           >
@@ -1130,6 +1325,208 @@ export default function AdminMembersPage() {
               <Trash2 className="size-4" /> Delete Member
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- ADD NEW MEMBER MODAL --- */}
+      <Dialog open={modals.create} onOpenChange={(o) => !o && setModals((m) => ({ ...m, create: false }))}>
+        <DialogContent className="max-w-lg bg-ink-soft border-white/10 text-white rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold font-heading text-steel flex items-center gap-2">
+              <UserPlus className="size-5 text-royal" /> Register New Member
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Add a new gym member to the registry with membership details and biometrics.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateMemberSubmit} className="mt-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Full Name *</label>
+                <Input
+                  value={newMemberForm.fullName}
+                  onChange={(e) => setNewMemberForm({ ...newMemberForm, fullName: e.target.value })}
+                  placeholder="e.g. Rahul Sharma"
+                  required
+                  className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Phone Number *</label>
+                <Input
+                  value={newMemberForm.phoneNumber}
+                  onChange={(e) => setNewMemberForm({ ...newMemberForm, phoneNumber: e.target.value })}
+                  placeholder="+91 98765 43210"
+                  required
+                  className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Email Address *</label>
+                <Input
+                  type="email"
+                  value={newMemberForm.email}
+                  onChange={(e) => setNewMemberForm({ ...newMemberForm, email: e.target.value })}
+                  placeholder="rahul@example.com"
+                  required
+                  className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Gender</label>
+                  <select
+                    value={newMemberForm.gender}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, gender: e.target.value })}
+                    className="h-10 w-full px-3 rounded-md bg-white/[0.02] border border-white/10 text-white text-xs focus:outline-none focus:border-royal"
+                  >
+                    <option value="Male" className="bg-ink-soft">Male</option>
+                    <option value="Female" className="bg-ink-soft">Female</option>
+                    <option value="Other" className="bg-ink-soft">Other</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Age</label>
+                  <Input
+                    type="number"
+                    value={newMemberForm.age}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, age: e.target.value })}
+                    className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/5 pt-4 space-y-4">
+              <p className="text-xs uppercase tracking-wider font-bold text-royal-light">Membership & Payment</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Package</label>
+                  <select
+                    value={newMemberForm.planId}
+                    onChange={(e) => {
+                      const selectedPlanId = e.target.value;
+                      const sel = gymPlans.find((p) => p.id === selectedPlanId);
+                      const baseDur = sel ? parseInt(sel.duration) || 3 : 3;
+                      const m = parseInt(newMemberForm.durationMonths) || 3;
+                      const est = sel ? Math.round((sel.price / baseDur) * m) : 4500;
+                      setNewMemberForm({
+                        ...newMemberForm,
+                        planId: selectedPlanId,
+                        pricePaid: est.toString()
+                      });
+                    }}
+                    className="h-10 w-full px-3 rounded-md bg-white/[0.02] border border-white/10 text-white text-xs focus:outline-none focus:border-royal"
+                  >
+                    {gymPlans.map((p) => (
+                      <option key={p.id} value={p.id} className="bg-ink-soft">
+                        {p.name} (₹{p.price} / {p.duration})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Duration</label>
+                  <select
+                    value={newMemberForm.durationMonths}
+                    onChange={(e) => {
+                      const m = parseInt(e.target.value);
+                      const sel = gymPlans.find((p) => p.id === newMemberForm.planId);
+                      const baseDur = sel ? parseInt(sel.duration) || 3 : 3;
+                      const est = sel ? Math.round((sel.price / baseDur) * m) : 4500;
+                      setNewMemberForm({
+                        ...newMemberForm,
+                        durationMonths: e.target.value,
+                        pricePaid: est.toString()
+                      });
+                    }}
+                    className="h-10 w-full px-3 rounded-md bg-white/[0.02] border border-white/10 text-white text-xs focus:outline-none focus:border-royal"
+                  >
+                    <option value="1" className="bg-ink-soft">1 Month</option>
+                    <option value="3" className="bg-ink-soft">3 Months</option>
+                    <option value="6" className="bg-ink-soft">6 Months</option>
+                    <option value="12" className="bg-ink-soft">12 Months</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Fee Amount (₹)</label>
+                  <Input
+                    type="number"
+                    value={newMemberForm.pricePaid}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, pricePaid: e.target.value })}
+                    required
+                    className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Payment Mode</label>
+                  <select
+                    value={newMemberForm.paymentMethod}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, paymentMethod: e.target.value })}
+                    className="h-10 w-full px-3 rounded-md bg-white/[0.02] border border-white/10 text-white text-xs focus:outline-none focus:border-royal"
+                  >
+                    <option value="UPI" className="bg-ink-soft">UPI / GPay / PhonePe</option>
+                    <option value="Cash" className="bg-ink-soft">Cash</option>
+                    <option value="Credit/Debit Card" className="bg-ink-soft">Credit / Debit Card</option>
+                    <option value="Net Banking" className="bg-ink-soft">Net Banking</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Status</label>
+                  <select
+                    value={newMemberForm.paymentStatus}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, paymentStatus: e.target.value })}
+                    className="h-10 w-full px-3 rounded-md bg-white/[0.02] border border-white/10 text-white text-xs focus:outline-none focus:border-royal"
+                  >
+                    <option value="Paid" className="bg-ink-soft">Paid</option>
+                    <option value="Pending" className="bg-ink-soft">Pending</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/5 pt-4 space-y-4">
+              <p className="text-xs uppercase tracking-wider font-bold text-royal-light">Biometrics (Optional Initial Assessment)</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Height (cm)</label>
+                  <Input
+                    type="number"
+                    value={newMemberForm.heightCm}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, heightCm: e.target.value })}
+                    placeholder="e.g. 175"
+                    className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Weight (kg)</label>
+                  <Input
+                    type="number"
+                    value={newMemberForm.weightKg}
+                    onChange={(e) => setNewMemberForm({ ...newMemberForm, weightKg: e.target.value })}
+                    placeholder="e.g. 72"
+                    className="border-white/10 focus-visible:border-royal bg-white/[0.02]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-royal hover:bg-royal-light text-white font-semibold font-heading h-12 mt-4"
+            >
+              Register Member & Activate Plan
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
