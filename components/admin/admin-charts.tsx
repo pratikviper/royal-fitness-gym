@@ -11,14 +11,14 @@ interface DataPoint {
 
 // --- 1. MEMBERSHIP GROWTH (LINE/AREA SVG CHART) ---
 export function MembershipGrowthChart({ data = [] }: { data?: DataPoint[] }) {
-  const points = data.length > 0 ? data : [
-    { label: "Feb", value: 3 },
-    { label: "Mar", value: 5 },
-    { label: "Apr", value: 8 },
-    { label: "May", value: 9 },
-    { label: "Jun", value: 11 },
-    { label: "Jul", value: 12 },
-  ];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const defaultMonths = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (5 - i));
+    return { label: months[d.getMonth()], value: 0 };
+  });
+
+  const points = data.length > 0 ? data : defaultMonths;
 
   const maxVal = Math.max(...points.map((p) => p.value), 10);
   const width = 500;
@@ -153,14 +153,14 @@ export function MembershipGrowthChart({ data = [] }: { data?: DataPoint[] }) {
 
 // --- 2. MONTHLY REVENUE (HTML FLEX BARS CHART) ---
 export function RevenueChart({ data = [] }: { data?: DataPoint[] }) {
-  const points = data.length > 0 ? data : [
-    { label: "Feb", value: 31000 },
-    { label: "Mar", value: 22000 },
-    { label: "Apr", value: 43500 },
-    { label: "May", value: 29000 },
-    { label: "Jun", value: 48000 },
-    { label: "Jul", value: 55000 },
-  ];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const defaultMonths = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (5 - i));
+    return { label: months[d.getMonth()], value: 0 };
+  });
+
+  const points = data.length > 0 ? data : defaultMonths;
 
   const maxVal = Math.max(...points.map((p) => p.value), 10000);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
@@ -179,7 +179,7 @@ export function RevenueChart({ data = [] }: { data?: DataPoint[] }) {
       {/* Bar container */}
       <div className="flex-1 flex items-end justify-between gap-4 h-[120px] px-2 relative">
         {points.map((p, i) => {
-          const heightPercent = `${(p.value / maxVal) * 100}%`;
+          const heightPercent = maxVal > 0 && p.value > 0 ? `${(p.value / maxVal) * 100}%` : "3px";
           return (
             <div 
               key={i} 
@@ -211,12 +211,7 @@ export function RevenueChart({ data = [] }: { data?: DataPoint[] }) {
 
 // --- 3. PLAN DISTRIBUTION (DONUT SVG CHART) ---
 export function PlanDistributionChart({ data = [] }: { data?: DataPoint[] }) {
-  const points = data.length > 0 ? data : [
-    { label: "All In One", value: 5 },
-    { label: "WT + Cardio", value: 4 },
-    { label: "Weight Training", value: 3 },
-  ];
-
+  const points = data;
   const total = points.reduce((acc, p) => acc + p.value, 0);
   
   // Render details for plan slices
@@ -254,73 +249,95 @@ export function PlanDistributionChart({ data = [] }: { data?: DataPoint[] }) {
     <div className="w-full h-[230px] rounded-xl bg-white/[0.01] border border-white/5 p-4 flex flex-col justify-between">
       <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">Package Share</h4>
       
-      <div className="flex-1 grid grid-cols-2 items-center gap-2">
-        {/* SVG Circle */}
-        <div className="relative flex justify-center items-center">
-          <svg viewBox="0 0 130 130" className="size-28 overflow-visible">
-            {/* Background ring */}
-            <circle
-              cx="65"
-              cy="65"
-              r={radius}
-              fill="transparent"
-              stroke="rgba(255, 255, 255, 0.03)"
-              strokeWidth={strokeWidth}
-            />
-
-            {/* Slices */}
-            {slices.map((slice, i) => (
-              <motion.circle
-                key={i}
+      {points.length === 0 || total === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center">
+          <div className="relative flex justify-center items-center mb-2">
+            <svg viewBox="0 0 130 130" className="size-24">
+              <circle
                 cx="65"
                 cy="65"
                 r={radius}
                 fill="transparent"
-                stroke={slice.color}
-                strokeWidth={hoveredSlice?.label === slice.label ? strokeWidth + 2 : strokeWidth}
-                strokeDasharray={slice.dashArray}
-                strokeDashoffset={slice.dashOffset}
-                strokeLinecap="butt"
-                style={{ transform: "rotate(-90deg)", transformOrigin: "65px 65px" }}
+                stroke="rgba(255, 255, 255, 0.05)"
+                strokeWidth={strokeWidth}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col justify-center items-center">
+              <span className="font-heading text-base font-bold text-white/50">0</span>
+              <span className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold leading-none">Members</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">No active plan subscriptions</p>
+        </div>
+      ) : (
+        <div className="flex-1 grid grid-cols-2 items-center gap-2">
+          {/* SVG Circle */}
+          <div className="relative flex justify-center items-center">
+            <svg viewBox="0 0 130 130" className="size-28 overflow-visible">
+              {/* Background ring */}
+              <circle
+                cx="65"
+                cy="65"
+                r={radius}
+                fill="transparent"
+                stroke="rgba(255, 255, 255, 0.03)"
+                strokeWidth={strokeWidth}
+              />
+
+              {/* Slices */}
+              {slices.map((slice, i) => (
+                <motion.circle
+                  key={i}
+                  cx="65"
+                  cy="65"
+                  r={radius}
+                  fill="transparent"
+                  stroke={slice.color}
+                  strokeWidth={hoveredSlice?.label === slice.label ? strokeWidth + 2 : strokeWidth}
+                  strokeDasharray={slice.dashArray}
+                  strokeDashoffset={slice.dashOffset}
+                  strokeLinecap="butt"
+                  style={{ transform: "rotate(-90deg)", transformOrigin: "65px 65px" }}
+                  onMouseEnter={() => setHoveredSlice(slice)}
+                  onMouseLeave={() => setHoveredSlice(null)}
+                  className="cursor-pointer transition-all duration-200"
+                  initial={{ strokeDasharray: `0 ${circumference}` }}
+                  animate={{ strokeDasharray: slice.dashArray }}
+                  transition={{ duration: 1, ease: "easeOut", delay: i * 0.1 }}
+                />
+              ))}
+            </svg>
+
+            {/* Central text readouts */}
+            <div className="absolute inset-0 flex flex-col justify-center items-center pointer-events-none select-none">
+              <span className="font-heading text-lg font-black text-white">
+                {hoveredSlice ? hoveredSlice.pctText : total}
+              </span>
+              <span className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold leading-none mt-0.5">
+                {hoveredSlice ? hoveredSlice.label.substring(0, 10) : "Members"}
+              </span>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="space-y-2">
+            {slices.map((slice, i) => (
+              <div 
+                key={i} 
+                className="flex items-center gap-2 text-xs font-semibold cursor-pointer group"
                 onMouseEnter={() => setHoveredSlice(slice)}
                 onMouseLeave={() => setHoveredSlice(null)}
-                className="cursor-pointer transition-all duration-200"
-                initial={{ strokeDasharray: `0 ${circumference}` }}
-                animate={{ strokeDasharray: slice.dashArray }}
-                transition={{ duration: 1, ease: "easeOut", delay: i * 0.1 }}
-              />
+              >
+                <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: slice.color }} />
+                <div className="flex-1 flex justify-between items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
+                  <span className="text-white/70 group-hover:text-white truncate">{slice.label}</span>
+                  <span className="text-white font-bold">{slice.value}</span>
+                </div>
+              </div>
             ))}
-          </svg>
-
-          {/* Central text readouts */}
-          <div className="absolute inset-0 flex flex-col justify-center items-center pointer-events-none select-none">
-            <span className="font-heading text-lg font-black text-white">
-              {hoveredSlice ? hoveredSlice.pctText : total}
-            </span>
-            <span className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold leading-none mt-0.5">
-              {hoveredSlice ? hoveredSlice.label.substring(0, 10) : "Members"}
-            </span>
           </div>
         </div>
-
-        {/* Legend */}
-        <div className="space-y-2">
-          {slices.map((slice, i) => (
-            <div 
-              key={i} 
-              className="flex items-center gap-2 text-xs font-semibold cursor-pointer group"
-              onMouseEnter={() => setHoveredSlice(slice)}
-              onMouseLeave={() => setHoveredSlice(null)}
-            >
-              <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: slice.color }} />
-              <div className="flex-1 flex justify-between items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
-                <span className="text-white/70 group-hover:text-white truncate">{slice.label}</span>
-                <span className="text-white font-bold">{slice.value}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

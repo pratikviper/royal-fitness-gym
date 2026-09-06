@@ -129,13 +129,8 @@ export default function AdminDashboardPage() {
           ({ members, memberships, payments, trainers, attendance } = loadLocalStorageData());
         }
 
-        // Check if database is empty
-        if (members.length === 0 && payments.length === 0 && trainers.length === 0) {
-          setIsEmpty(true);
-          setLoading(false);
-          return;
-        }
-        setIsEmpty(false);
+        // Note if database has no regular members yet
+        setIsEmpty(members.length === 0 && payments.length === 0);
 
         // --- 3. CALCULATE STATS ---
         const today = new Date();
@@ -293,7 +288,6 @@ export default function AdminDashboardPage() {
       } catch (err) {
         console.error("Dashboard calculation failed:", err);
       } finally {
-        setLoadingData(false);
         setLoading(false);
       }
     };
@@ -313,9 +307,18 @@ export default function AdminDashboardPage() {
 
     uids.forEach((uid) => {
       const p = localStorage.getItem(`rf_profile_${uid}`);
+      if (p) {
+        try {
+          members.push(JSON.parse(p));
+        } catch {}
+      }
+
       const m = localStorage.getItem(`rf_membership_${uid}`);
-      if (p) members.push(JSON.parse(p));
-      if (m) memberships[uid] = JSON.parse(m);
+      if (m) {
+        try {
+          memberships[uid] = JSON.parse(m);
+        } catch {}
+      }
     });
 
     const payments = JSON.parse(localStorage.getItem("rf_payments") || "[]");
@@ -325,8 +328,6 @@ export default function AdminDashboardPage() {
     return { members, memberships, payments, trainers, attendance };
   };
 
-  const [loadingData, setLoadingData] = useState(true);
-
   if (loading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
@@ -334,28 +335,6 @@ export default function AdminDashboardPage() {
         <p className="text-sm text-muted-foreground uppercase tracking-widest font-semibold">
           Compiling Stats...
         </p>
-      </div>
-    );
-  }
-
-  if (isEmpty) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 text-center max-w-md mx-auto">
-        <div className="rounded-full bg-white/5 border border-white/10 p-6 text-muted-foreground">
-          <Database className="size-12 text-royal animate-bounce" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="font-heading text-2xl font-bold tracking-wide">No Data Available</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            The Gym management database is currently empty. Navigate to the Settings tab to seed dummy members, trainer assignments, and revenue reports.
-          </p>
-        </div>
-        <Button 
-          onClick={() => router.push("/admin/settings")}
-          className="bg-royal hover:bg-royal-light text-white font-heading font-semibold px-6"
-        >
-          Go to Settings
-        </Button>
       </div>
     );
   }
@@ -374,6 +353,27 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
+      {isEmpty && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-royal/20 bg-royal/5 p-4 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="grid size-8 place-items-center rounded-lg bg-royal/20 text-royal-light shrink-0">
+              <Database className="size-4" />
+            </div>
+            <div>
+              <p className="font-semibold text-white">Live Database Active</p>
+              <p className="text-muted-foreground">All non-admin users purged. Metrics, revenue charts, and registrations will populate in real time as new members sign up.</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => router.push("/admin/members")}
+            className="shrink-0 bg-royal hover:bg-royal-light text-white font-heading text-xs uppercase"
+          >
+            Manage Members
+          </Button>
+        </div>
+      )}
+
       {/* 1. CARDS GRID */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         {cardItems.map((c, i) => (
@@ -415,23 +415,29 @@ export default function AdminDashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="space-y-4">
-              {recentRegistrations.map((m) => (
-                <div key={m.uid} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0 last:pb-0">
-                  <div className="flex items-center gap-3">
-                    <Avatar size="sm" src={m.photoURL} name={m.fullName} />
-                    <div>
-                      <p className="text-xs font-semibold text-white">{m.fullName}</p>
-                      <p className="text-[10px] text-muted-foreground">{m.email}</p>
+            {recentRegistrations.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">
+                No member registrations recorded yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentRegistrations.map((m) => (
+                  <div key={m.uid} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <Avatar size="sm" src={m.photoURL} name={m.fullName} />
+                      <div>
+                        <p className="text-xs font-semibold text-white">{m.fullName}</p>
+                        <p className="text-[10px] text-muted-foreground">{m.email}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] uppercase font-bold text-royal-light tracking-wide">{m.planName}</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">Joined: {m.joiningDate}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] uppercase font-bold text-royal-light tracking-wide">{m.planName}</p>
-                    <p className="text-[9px] text-muted-foreground mt-0.5">Joined: {m.joiningDate}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -451,22 +457,28 @@ export default function AdminDashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="space-y-4">
-              {recentPayments.map((p) => (
-                <div key={p.invoiceNo} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0 last:pb-0">
-                  <div>
-                    <p className="text-xs font-semibold text-white">{p.fullName}</p>
-                    <p className="text-[9px] font-heading text-muted-foreground tracking-wider uppercase">{p.invoiceNo}</p>
+            {recentPayments.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">
+                No payment transactions recorded yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentPayments.map((p) => (
+                  <div key={p.invoiceNo} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0 last:pb-0">
+                    <div>
+                      <p className="text-xs font-semibold text-white">{p.fullName}</p>
+                      <p className="text-[9px] font-heading text-muted-foreground tracking-wider uppercase">{p.invoiceNo}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-heading font-bold text-white">₹{p.amount.toLocaleString("en-IN")}</p>
+                      <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 text-[8px] uppercase tracking-wider text-emerald-400 font-bold mt-0.5">
+                        {p.status}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs font-heading font-bold text-white">₹{p.amount.toLocaleString("en-IN")}</p>
-                    <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 text-[8px] uppercase tracking-wider text-emerald-400 font-bold mt-0.5">
-                      {p.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
