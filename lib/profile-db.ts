@@ -19,6 +19,8 @@ export interface UserProfileDetails {
   /** Admin-only tombstone set by the member purge; hides the account. */
   deleted?: boolean;
   deletedAt?: string;
+  /** Admin-only. Enrolment number on the biometric terminal, e.g. "42". */
+  biometricId?: string;
   address?: string;
   dob?: string;
   emergencyContact?: string;

@@ -48,6 +48,45 @@ Two boundaries protect member data, and both must be in place:
    `lib/server/*`, which is `server-only`-guarded so a stray client import
    fails the build.
 
+## Biometric attendance (eSSL / ZKTeco)
+
+The terminal pushes punches to the app; the app never dials the device. That
+matters because the scanner sits on the gym LAN behind a router while the app
+runs on Vercel — outbound calls need no port forwarding or static IP.
+
+**Endpoints** (ADMS / "Push SDK" protocol, shapes dictated by the firmware):
+
+| Route | Purpose |
+| --- | --- |
+| `GET  /api/iclock/<secret>/cdata` | Handshake — device asks how to behave |
+| `POST /api/iclock/<secret>/cdata` | Attendance upload (tab-separated records) |
+| `GET  /api/iclock/<secret>/getrequest` | Device polls for pending commands |
+| `POST /api/iclock/<secret>/devicecmd` | Device reports a command result |
+
+**Setup**
+
+1. Set `BIOMETRIC_DEVICE_SERIALS` and `BIOMETRIC_INGEST_SECRET` (see
+   `.env.example`). Both are required — an empty allowlist rejects everything.
+2. On the device: **Menu → Comm → Ethernet / Cloud Server (ADMS)**, set the
+   server address to your domain, port `443`, and enable HTTPS/domain mode.
+3. Enrol the member's finger on the device and note the **User ID** it assigns.
+4. Put that number in **Biometric Enrolment ID** on the member's profile in the
+   admin console. This mapping is what links a punch to an account.
+
+**How a punch becomes attendance:** each raw punch is stored in
+`attendance_punches` under a deterministic id (`serial_user_timestamp`), which
+makes replays idempotent — terminals resend their whole buffer on reconnect.
+Matched punches then fold into `attendance/{uid}_{date}`, earliest becoming
+`checkIn` and latest `checkOut`, so the existing attendance page needs no
+changes. Staff can still mark attendance by hand; `source` distinguishes the two.
+
+A punch whose enrolment number isn't mapped to anyone is **kept**, not dropped,
+with `uid: null` — so enrolling on the device before linking the profile loses
+nothing; fill in the ID and the history is already there.
+
+`biometricId` is a staff-only field in `firestore.rules`: a member who could set
+their own would collect another member's attendance.
+
 ## Scripts
 
 | Command | Description |

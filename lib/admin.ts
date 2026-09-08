@@ -12,8 +12,20 @@ export const ADMIN_EMAIL =
   process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase() ||
   "admin@royalfitness.com";
 
-/** Fields the client is never allowed to set on its own user document. */
-export const PRIVILEGED_USER_FIELDS = ["role", "status", "deleted", "deletedAt"] as const;
+/**
+ * Fields the client is never allowed to set on its own user document.
+ *
+ * `biometricId` is in here because it maps a fingerprint terminal's enrolment
+ * number to this account — a member who could set their own could point it at
+ * someone else's enrolment and collect their attendance.
+ */
+export const PRIVILEGED_USER_FIELDS = [
+  "role",
+  "status",
+  "deleted",
+  "deletedAt",
+  "biometricId",
+] as const;
 
 /** Shape of the user-document fields these helpers care about. */
 export interface UserRecordFlags {

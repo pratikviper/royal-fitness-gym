@@ -49,6 +49,24 @@ export interface AttendanceRecord {
   status: "Present" | "Absent";
   checkIn?: string;
   checkOut?: string;
+  /** How the record was created; absent on older manually-marked rows. */
+  source?: "biometric" | "manual";
+  /** Serial of the terminal that produced it, when source is "biometric". */
+  deviceSerial?: string;
+}
+
+/** A raw punch from a biometric terminal, before it is folded into a day. */
+export interface AttendancePunchRecord {
+  serial: string;
+  deviceUserId: string;
+  /** null when the enrolment number isn't linked to a member yet. */
+  uid: string | null;
+  date: string;
+  time: string;
+  timestamp: string;
+  status: string;
+  verifyMode: string;
+  receivedAt: string;
 }
 
 /** A document in `trainers`. */

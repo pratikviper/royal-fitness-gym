@@ -79,6 +79,9 @@ interface CompiledMember {
   heightCm?: number;
   weightKg?: number;
   bmiScore?: number;
+
+  /** Enrolment number on the biometric terminal, when enrolled. */
+  biometricId?: string;
 }
 
 export default function AdminMembersPage() {
@@ -138,6 +141,7 @@ export default function AdminMembersPage() {
     age: "",
     heightCm: "",
     weightKg: "",
+    biometricId: "",
   });
 
   // Renew form states
@@ -291,7 +295,8 @@ export default function AdminMembersPage() {
 
           heightCm: latestBmi?.heightCm || p.heightCm,
           weightKg: latestBmi?.weightKg || p.weightKg,
-          bmiScore: latestBmi?.bmiScore || p.bmiScore
+          bmiScore: latestBmi?.bmiScore || p.bmiScore,
+          biometricId: p.biometricId
         };
       });
 
@@ -525,6 +530,7 @@ export default function AdminMembersPage() {
       age: member.age?.toString() || "25",
       heightCm: member.heightCm?.toString() || "175",
       weightKg: member.weightKg?.toString() || "70",
+      biometricId: member.biometricId || "",
     });
     setModals((m) => ({ ...m, edit: true }));
   };
@@ -565,6 +571,9 @@ export default function AdminMembersPage() {
         heightCm: parsedHeight,
         weightKg: parsedWeight,
         bmiScore,
+        // Empty means "not enrolled"; store null so the punch lookup skips it
+        // instead of matching an empty enrolment number.
+        biometricId: editForm.biometricId.trim() || null,
       };
 
       if (db) {
@@ -1223,6 +1232,22 @@ export default function AdminMembersPage() {
                   className="border-white/10 focus-visible:border-royal"
                 />
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                Biometric Enrolment ID
+              </label>
+              <Input
+                value={editForm.biometricId}
+                onChange={(e) => setEditForm({ ...editForm, biometricId: e.target.value })}
+                placeholder="e.g. 42 — the User ID shown on the fingerprint device"
+                className="border-white/10 focus-visible:border-royal"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Must match the User ID this member was enrolled under on the
+                terminal. Leave blank if they don&apos;t use the scanner.
+              </p>
             </div>
 
             <Button

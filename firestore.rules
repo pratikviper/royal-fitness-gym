@@ -43,10 +43,14 @@ service cloud.firestore {
     // themselves. Compared with get(k, default) so legacy docs missing these
     // fields still validate.
 
+    // biometricId maps a fingerprint terminal's enrolment number to this
+    // account; a member who could set it would collect another member's
+    // attendance, so it is staff-only like the rest.
     function preservesPrivilegedFields() {
       return request.resource.data.get('role', null) == resource.data.get('role', null)
           && request.resource.data.get('status', null) == resource.data.get('status', null)
-          && request.resource.data.get('deleted', false) == resource.data.get('deleted', false);
+          && request.resource.data.get('deleted', false) == resource.data.get('deleted', false)
+          && request.resource.data.get('biometricId', null) == resource.data.get('biometricId', null);
     }
 
     // A self-created profile may only ever start as a live, non-admin member.
@@ -96,6 +100,14 @@ service cloud.firestore {
 
     // ─── Attendance ────────────────────────────────────────────────────────
     match /attendance/{recordId} {
+      allow read, write: if isAdmin();
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // Raw punches from the biometric terminal. Written only by the server
+    // (the Admin SDK bypasses these rules); staff read them to reconcile
+    // punches whose enrolment number isn't linked to a member yet.
+    match /attendance_punches/{punchId} {
       allow read, write: if isAdmin();
       allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
     }
