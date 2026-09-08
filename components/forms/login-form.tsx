@@ -20,10 +20,8 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { 
-  loginSchema, 
-  type LoginValues,
-  phoneLoginSchema,
-  type PhoneLoginValues 
+  loginSchema,
+  type LoginValues
 } from "@/lib/validations";
 import {
   Form,

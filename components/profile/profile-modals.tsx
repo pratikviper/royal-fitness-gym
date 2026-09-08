@@ -8,7 +8,6 @@ import {
   KeyRound, 
   Loader2, 
   Check, 
-  ShieldAlert, 
   LogOut,
   AlertTriangle
 } from "lucide-react";
@@ -41,11 +40,15 @@ interface RenewModalProps {
   onUpdate: (membership: UserMembership) => void;
 }
 
+/**
+ * Staff-facing plan assignment, opened from the admin member detail page.
+ * Firestore rules restrict `memberships` writes to admins.
+ */
 export function RenewMembershipModal({ isOpen, onClose, uid, onUpdate }: RenewModalProps) {
   const [selectedPlanId, setSelectedPlanId] = useState("all-in-one");
   const [selectedMonths, setSelectedMonths] = useState(3);
   const [loading, setLoading] = useState(false);
-  const [simulationMode, setSimulationMode] = useState<"normal" | "expiring" | "expired">("normal");
+  const [error, setError] = useState<string | null>(null);
 
   const selectedPlan = memberships.find((m) => m.id === selectedPlanId) || memberships[2];
   const selectedDuration = selectedPlan.durations.find((d) => d.months === selectedMonths) || selectedPlan.durations[0];
@@ -54,56 +57,25 @@ export function RenewMembershipModal({ isOpen, onClose, uid, onUpdate }: RenewMo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
-      let mockUpdated: UserMembership;
+      const updated = await renewMembershipPlan(
+        uid,
+        selectedPlan.id,
+        selectedPlan.name,
+        selectedMonths,
+        price
+      );
 
-      if (simulationMode === "expired") {
-        // Creates a membership that expired 2 days ago
-        mockUpdated = await renewMembershipPlan(uid, selectedPlan.id, selectedPlan.name, selectedMonths, price, true);
-      } else if (simulationMode === "expiring") {
-        // Creates a membership with 3 days remaining
-        const startDate = new Date();
-        startDate.setMonth(startDate.getMonth() - selectedMonths);
-        // Add 3 days from now
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + 3);
-
-        const updatedData: UserMembership = {
-          planId: selectedPlan.id,
-          planName: selectedPlan.name,
-          startDate: startDate.toISOString().split("T")[0],
-          endDate: endDate.toISOString().split("T")[0],
-          durationMonths: selectedMonths,
-          pricePaid: price,
-        };
-
-        const isBrowser = typeof window !== "undefined";
-        if (auth.currentUser && !localStorage.getItem("rf_current_user")) {
-          // If we had a database, we would store it. But locally:
-          const { doc, setDoc } = await import("firebase/firestore");
-          const { db } = await import("@/lib/firebase");
-          if (db) {
-            await setDoc(doc(db, "memberships", uid), updatedData);
-          }
-        }
-        if (isBrowser) {
-          localStorage.setItem(`rf_membership_${uid}`, JSON.stringify(updatedData));
-        }
-        mockUpdated = updatedData;
-      } else {
-        // Normal renewal
-        mockUpdated = await renewMembershipPlan(uid, selectedPlan.id, selectedPlan.name, selectedMonths, price);
-      }
-
-      onUpdate(mockUpdated);
+      onUpdate(updated);
       // Dispatch storage event to alert other components
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("storage"));
       }
       onClose();
     } catch (err) {
-      console.error(err);
-      alert("Failed to renew membership. Please try again.");
+      console.error("Failed to assign membership:", err);
+      setError("Could not save the membership. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -168,28 +140,11 @@ export function RenewMembershipModal({ isOpen, onClose, uid, onUpdate }: RenewMo
             </div>
           </div>
 
-          {/* Seeding State simulation */}
-          <div className="space-y-2 border-t border-white/5 pt-4">
-            <label className="text-xs uppercase tracking-wider text-amber-500 font-semibold flex items-center gap-1">
-              <ShieldAlert className="size-3.5" /> Simulation / Test Modes
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(["normal", "expiring", "expired"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setSimulationMode(mode)}
-                  className={`py-1.5 px-2 rounded-lg border text-[10px] uppercase font-bold text-center transition-all duration-300 ${
-                    simulationMode === mode
-                      ? "border-amber-500 bg-amber-500/10 text-amber-400"
-                      : "border-white/5 bg-white/[0.01] hover:border-white/10 text-white/40"
-                  }`}
-                >
-                  {mode === "normal" ? "Standard" : mode === "expiring" ? "Expires in 3d" : "Expired"}
-                </button>
-              ))}
-            </div>
-          </div>
+          {error && (
+            <p role="alert" className="text-xs text-rose-400">
+              {error}
+            </p>
+          )}
 
           {/* Price details and Action Button */}
           <div className="flex items-center justify-between border-t border-white/5 pt-4">

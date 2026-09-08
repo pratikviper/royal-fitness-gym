@@ -11,6 +11,7 @@ import {
   RecaptchaVerifier,
   type ConfirmationResult,
 } from "firebase/auth";
+import type { UserCredential } from "firebase/auth";
 import { auth } from "@/lib/auth";
 import { getProfileDetails } from "@/lib/profile-db";
 
@@ -38,6 +39,35 @@ const checkFirebaseConfigured = (): boolean => {
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
   return !!(apiKey && apiKey !== "YOUR_API_KEY" && !apiKey.startsWith("YOUR_"));
 };
+
+/** The invisible-reCAPTCHA verifier is parked on `window` between renders. */
+interface RecaptchaWindow extends Window {
+  __rf_recaptchaVerifier?: RecaptchaVerifier | null;
+}
+
+/** Pulls the Firebase error code/message off an unknown thrown value. */
+function describeAuthError(error: unknown): { code: string; message: string } {
+  const code =
+    error && typeof error === "object" && "code" in error ? String(error.code) : "";
+  const message = error instanceof Error ? error.message : "";
+  return { code, message };
+}
+
+/**
+ * Hashes a mock-mode password before it touches localStorage.
+ *
+ * Mock mode is the offline fallback used when Firebase isn't configured, but
+ * people reuse passwords — storing them in cleartext would leak real
+ * credentials to anything that can read site storage. Not a substitute for
+ * server-side hashing; real auth goes through Firebase.
+ */
+async function hashMockPassword(password: string): Promise<string> {
+  const bytes = new TextEncoder().encode(`rf_mock_v1:${password}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 /** Normalizes phone numbers into E.164 international format (defaulting to +91 for 10-digit numbers). */
 export function formatPhoneNumber(phone: string): string {
@@ -116,9 +146,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         await new Promise((resolve) => setTimeout(resolve, 800));
         const usersJson = localStorage.getItem("rf_users") || "[]";
-        const users = JSON.parse(usersJson) as Array<User & { password?: string }>;
+        const users = JSON.parse(usersJson) as Array<User & { passwordHash?: string }>;
+        const passwordHash = await hashMockPassword(password);
         const matchedUser = users.find(
-          (u) => u.email?.toLowerCase() === email.toLowerCase() && u.password === password
+          (u) => u.email?.toLowerCase() === email.toLowerCase() && u.passwordHash === passwordHash
         );
 
         if (!matchedUser) {
@@ -166,7 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         await new Promise((resolve) => setTimeout(resolve, 800));
         const usersJson = localStorage.getItem("rf_users") || "[]";
-        const users = JSON.parse(usersJson) as Array<User & { password?: string }>;
+        const users = JSON.parse(usersJson) as Array<User & { passwordHash?: string }>;
 
         if (users.some((u) => u.email?.toLowerCase() === email.toLowerCase())) {
           throw new Error("An account with this email already exists.");
@@ -177,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email,
           phoneNumber: null,
           displayName: name,
-          password,
+          passwordHash: await hashMockPassword(password),
         };
 
         users.push(newMockUser);
@@ -240,7 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
           localStorage.setItem("rf_current_user", JSON.stringify(authenticatedUser));
           setUser(authenticatedUser);
-          return { user: authenticatedUser } as any;
+          return { user: authenticatedUser } as unknown as UserCredential;
         },
       } as unknown as ConfirmationResult;
     }
@@ -249,7 +280,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Window is not defined.");
     }
 
-    const win = window as any;
+    const win = window as RecaptchaWindow;
 
     // Reset previous recaptcha verifier if exists
     if (win.__rf_recaptchaVerifier) {
@@ -284,7 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, verifier);
       return confirmationResult;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (win.__rf_recaptchaVerifier) {
         try {
           win.__rf_recaptchaVerifier.clear();
@@ -295,8 +326,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.error("[Phone Auth] sendPhoneOtp error:", error);
-      const code = error?.code || "";
-      const msg = error?.message || "";
+      const { code, message: msg } = describeAuthError(error);
 
       if (code === "auth/invalid-phone-number") {
         throw new Error("The phone number format is invalid. Please enter a valid 10-digit mobile number.");
@@ -360,10 +390,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         phoneNumber: fbUser.phoneNumber,
         displayName: resolvedName,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[Phone Auth] verifyPhoneOtp error:", error);
-      const code = error?.code || "";
-      const msg = error?.message || "";
+      const { code, message: msg } = describeAuthError(error);
 
       if (code === "auth/invalid-verification-code") {
         throw new Error("Invalid verification code. Please check the 6-digit OTP and try again.");

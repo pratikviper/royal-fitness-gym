@@ -1,14 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
-  Award, 
   Plus, 
   Edit2, 
   Trash2, 
   Check, 
   Loader2, 
-  DollarSign, 
   Clock, 
   AlertTriangle 
 } from "lucide-react";
@@ -58,7 +56,7 @@ export default function AdminPlansPage() {
     features: "",
   });
 
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     setLoading(true);
     try {
       let tempPlans: GymPlan[] = [];
@@ -97,7 +95,7 @@ export default function AdminPlansPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   const loadLocalPlansFallback = () => {
     const isBrowser = typeof window !== "undefined";
@@ -123,7 +121,7 @@ export default function AdminPlansPage() {
 
   useEffect(() => {
     loadPlans();
-  }, []);
+  }, [loadPlans]);
 
   const openCreateModal = () => {
     setForm({
@@ -388,7 +386,7 @@ export default function AdminPlansPage() {
               <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Plan Status</label>
               <select
                 value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value as any })}
+                onChange={(e) => setForm({ ...form, status: e.target.value as GymPlan["status"] })}
                 className="h-12 w-full px-4 rounded-md bg-white/[0.02] border border-white/10 text-white focus:outline-none focus:border-royal"
               >
                 <option value="Active" className="bg-ink-soft">Active</option>
@@ -470,7 +468,7 @@ export default function AdminPlansPage() {
               <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Plan Status</label>
               <select
                 value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value as any })}
+                onChange={(e) => setForm({ ...form, status: e.target.value as GymPlan["status"] })}
                 className="h-12 w-full px-4 rounded-md bg-white/[0.02] border border-white/10 text-white focus:outline-none focus:border-royal"
               >
                 <option value="Active" className="bg-ink-soft">Active</option>

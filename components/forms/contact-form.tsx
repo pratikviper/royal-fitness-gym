@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { submitContactEnquiry } from "@/lib/enquiries";
 
 const interests = [
   "Membership",
@@ -27,11 +28,12 @@ const interests = [
 ] as const;
 
 /**
- * Contact form — zod-validated. Replace the onSubmit stub with a call to your
- * route handler / server action (or Firebase/Supabase) when the backend lands.
+ * Contact form — zod-validated, then filed to `contact_enquiries` where the
+ * admin Enquiries console picks it up.
  */
 export function ContactForm() {
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<ContactValues>({
     resolver: zodResolver(contactSchema),
@@ -44,11 +46,19 @@ export function ContactForm() {
     },
   });
 
-  async function onSubmit(_values: ContactValues) {
-    // TODO: send to /api/contact (route handler) or a server action.
-    await new Promise((r) => setTimeout(r, 900));
-    setSent(true);
-    form.reset();
+  async function onSubmit(values: ContactValues) {
+    setError(null);
+    try {
+      await submitContactEnquiry(values);
+      setSent(true);
+      form.reset();
+    } catch (err) {
+      // Never claim the message was sent when the write failed.
+      console.error("Contact enquiry submission failed:", err);
+      setError(
+        "We couldn't send your message just now. Please try again, or reach us on WhatsApp."
+      );
+    }
   }
 
   if (sent) {
@@ -158,6 +168,12 @@ export function ContactForm() {
             </FormItem>
           )}
         />
+
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
         <Button
           type="submit"

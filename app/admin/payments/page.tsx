@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
   DollarSign, 
   Clock, 
@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isListableMember } from "@/lib/admin";
+import type { UserRecord, PaymentRecord } from "@/types/firestore";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +44,7 @@ interface GymPayment {
 export default function AdminPaymentsPage() {
   const { showToast } = useToast();
   const [payments, setPayments] = useState<GymPayment[]>([]);
-  const [allMembers, setAllMembers] = useState<any[]>([]);
+  const [allMembers, setAllMembers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   // States for search and tabs
@@ -64,24 +66,22 @@ export default function AdminPaymentsPage() {
     date: new Date().toISOString().split("T")[0]
   });
 
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async () => {
     setLoading(true);
     try {
       let tempPayments: GymPayment[] = [];
-      const profiles: Record<string, any> = {};
-      const memberList: any[] = [];
+      const profiles: Record<string, UserRecord> = {};
+      const memberList: UserRecord[] = [];
 
       if (db) {
         try {
           // Fetch profiles first for name mapping
           const usersSnap = await getDocs(collection(db, "users"));
           usersSnap.forEach((doc) => {
-            const d = doc.data();
+            const d = doc.data() as UserRecord;
             profiles[doc.id] = d;
-            const email = (d.email || "").toLowerCase();
-            const isUserAdmin = d.role === "admin" || email === "admin@royalfitness.com";
-            if (!isUserAdmin) {
-              memberList.push({ uid: doc.id, ...d });
+            if (isListableMember(d)) {
+              memberList.push({ ...d, uid: doc.id });
             }
           });
           setAllMembers(memberList);
@@ -119,22 +119,22 @@ export default function AdminPaymentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   const loadLocalPaymentsFallback = () => {
     const isBrowser = typeof window !== "undefined";
     if (!isBrowser) return [];
 
-    const payments = JSON.parse(localStorage.getItem("rf_payments") || "[]") as any[];
+    const payments = JSON.parse(localStorage.getItem("rf_payments") || "[]") as PaymentRecord[];
     
     // Map names from localStorage
     const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
     const uids = JSON.parse(uidsJson) as string[];
-    const profiles: Record<string, any> = {};
+    const profiles: Record<string, UserRecord> = {};
 
     uids.forEach((uid) => {
       const cached = localStorage.getItem(`rf_profile_${uid}`);
-      if (cached) profiles[uid] = JSON.parse(cached);
+      if (cached) profiles[uid] = JSON.parse(cached) as UserRecord;
     });
 
     return payments.map((p) => {
@@ -156,7 +156,7 @@ export default function AdminPaymentsPage() {
 
   useEffect(() => {
     loadPayments();
-  }, []);
+  }, [loadPayments]);
 
   const handleMarkPaid = async (payment: GymPayment) => {
     try {
@@ -173,7 +173,7 @@ export default function AdminPaymentsPage() {
       } else {
         // LocalStorage update
         const cached = localStorage.getItem("rf_payments") || "[]";
-        const list = JSON.parse(cached) as any[];
+        const list = JSON.parse(cached) as PaymentRecord[];
         const updatedList = list.map((item) => 
           item.invoiceNo === payment.invoiceNo ? { ...item, status: "Paid" } : item
         );

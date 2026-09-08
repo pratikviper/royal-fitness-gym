@@ -4,10 +4,8 @@ import { bebasNeue, inter } from "@/lib/fonts";
 import { buildMetadata, organizationJsonLd } from "@/lib/seo";
 import { SITE_URL } from "@/lib/constants";
 import { Providers } from "@/components/shared/providers";
-import { Navbar } from "@/components/navbar/navbar";
-import { Footer } from "@/components/footer/footer";
-import { ScrollProgressBar } from "@/components/shared/scroll-progress-bar";
-import { WhatsAppButton } from "@/components/shared/whatsapp-button";
+// Navbar, Footer, ScrollProgressBar and WhatsAppButton are rendered by
+// LayoutWrapper, which skips them on admin routes.
 import LayoutWrapper from "@/components/shared/LayoutWrapper";
 
 export const metadata: Metadata = {

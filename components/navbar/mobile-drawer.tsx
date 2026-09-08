@@ -12,8 +12,7 @@ import { Logo } from "@/components/shared/logo";
 import { useAuth } from "@/lib/auth-context";
 import { getProfileDetails } from "@/lib/profile-db";
 import { Avatar } from "@/components/shared/avatar";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 /** Full-screen animated mobile navigation drawer. */
 export function MobileDrawer() {
@@ -22,10 +21,10 @@ export function MobileDrawer() {
   const { user, logout } = useAuth();
   const [displayName, setDisplayName] = useState("Member");
   const [photoURL, setPhotoURL] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = useIsAdmin();
 
   useEffect(() => {
-    if (!user) { setIsAdmin(false); return; }
+    if (!user) return;
     setDisplayName(user.displayName || "Member");
 
     const loadProfile = async () => {
@@ -38,32 +37,6 @@ export function MobileDrawer() {
       }
     };
     loadProfile();
-
-    // Determine admin role
-    const checkAdmin = async () => {
-      const isAdminEmail = !!(
-        user.email?.toLowerCase() === "admin@royalfitness.com" ||
-        user.email?.toLowerCase().includes("admin")
-      );
-      if (db) {
-        try {
-          const snap = await getDoc(doc(db, "users", user.uid));
-          const role = snap.exists() ? snap.data()?.role : null;
-          setIsAdmin(role === "admin" || isAdminEmail);
-          return;
-        } catch { /* fall through */ }
-      }
-      const cached = localStorage.getItem(`rf_profile_${user.uid}`);
-      if (cached) {
-        try {
-          const data = JSON.parse(cached);
-          setIsAdmin(data.role === "admin" || isAdminEmail);
-          return;
-        } catch { /* ignore */ }
-      }
-      setIsAdmin(isAdminEmail);
-    };
-    checkAdmin();
 
     const handleStorageChange = () => { loadProfile(); };
     window.addEventListener("storage", handleStorageChange);

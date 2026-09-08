@@ -7,13 +7,15 @@ import { ArrowRight, Check } from "lucide-react";
 import { newsletterSchema, type NewsletterValues } from "@/lib/validations";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { subscribeToNewsletter } from "@/lib/enquiries";
 
 /**
- * Newsletter opt-in. Client-side validated with zod; swap the onSubmit body
- * for a real API/route handler when the mailing provider is wired up.
+ * Newsletter opt-in. Validated with zod, then persisted to
+ * `newsletter_subscribers` (localStorage when Firebase isn't configured).
  */
 export function NewsletterForm() {
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -23,12 +25,17 @@ export function NewsletterForm() {
     resolver: zodResolver(newsletterSchema),
   });
 
-  async function onSubmit(_values: NewsletterValues) {
-    // TODO: POST to /api/newsletter or your provider (Mailchimp, Resend, ...)
-    await new Promise((r) => setTimeout(r, 600));
-    setDone(true);
-    reset();
-    setTimeout(() => setDone(false), 4000);
+  async function onSubmit(values: NewsletterValues) {
+    setError(null);
+    try {
+      await subscribeToNewsletter(values.email);
+      setDone(true);
+      reset();
+      setTimeout(() => setDone(false), 4000);
+    } catch (err) {
+      console.error("Newsletter subscription failed:", err);
+      setError("Could not subscribe right now. Please try again.");
+    }
   }
 
   return (
@@ -53,6 +60,7 @@ export function NewsletterForm() {
       {errors.email && (
         <p className="text-xs text-destructive">{errors.email.message}</p>
       )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
       {done && (
         <p className="text-xs text-royal">You&apos;re on the list — welcome!</p>
       )}

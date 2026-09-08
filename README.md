@@ -6,24 +6,57 @@ An Awwwards-caliber, production-ready luxury fitness website built with **Next.j
 
 ## Getting Started
 
+This project uses **Yarn** (PnP) — `yarn.lock` is the source of truth.
+
 ```bash
-npm install
-npm run dev
+yarn install
+yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Copy `.env.example` → `.env.local` and fill values as you wire up integrations.
+Copy `.env.example` → `.env.local` and fill in the values.
+
+## Access control
+
+Two boundaries protect member data, and both must be in place:
+
+1. **Firestore security rules** (`firestore.rules`) govern everything the
+   browser does. They are not active until you publish them:
+
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+
+   `isAdmin()` there matches the bootstrap address exactly, or `role: "admin"`
+   on the caller's user document. `lib/admin.ts` mirrors this for the UI —
+   change one and you must change the other, including `NEXT_PUBLIC_ADMIN_EMAIL`.
+   A member cannot write `role` to their own document, by rule.
+
+2. **`/api/admin/*` route handlers** use the Firebase Admin SDK, which bypasses
+   the rules entirely — so each route authorises the caller itself via
+   `requireAdmin()`. They need `FIREBASE_SERVICE_ACCOUNT` (see `.env.example`).
+   Without it the routes return 503 and the rest of the app is unaffected.
+
+   These routes exist because the client SDK cannot manage other people's
+   accounts: creating one would hijack the admin's own session, and deleting a
+   member's documents leaves their login working. Creating and deleting members
+   from the admin console therefore requires a Node runtime — a static export
+   will not serve them.
+
+   **Never** expose the service account to the browser. It is read only from
+   `lib/server/*`, which is `server-only`-guarded so a stray client import
+   fails the build.
 
 ## Scripts
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start the dev server |
-| `npm run build` | Production build |
-| `npm run start` | Serve the production build |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | Type-check with `tsc` |
+| `yarn dev` | Start the dev server |
+| `yarn build` | Production build |
+| `yarn start` | Serve the production build |
+| `yarn lint` | ESLint |
+| `yarn typecheck` | Type-check with `tsc` |
 
 ## Project Structure
 
@@ -56,7 +89,7 @@ Data and forms are structured for easy backend wiring:
 
 - **Auth / DB**: Firebase, Supabase, MongoDB, PostgreSQL — data layer is isolated in `data/`.
 - **Payments**: Razorpay / Stripe — hook into the membership "Choose plan" CTAs.
-- **Contact / Newsletter**: forms validate with Zod and expose a single `onSubmit` — point it at a route handler or server action.
+- **Contact / Newsletter**: wired — submissions persist to `contact_enquiries` / `newsletter_subscribers` via `lib/enquiries.ts` and surface in the admin Enquiries console. Add email delivery on top if you want notifications.
 - **Booking / Attendance / Admin**: the component + type structure supports adding member/trainer flows without refactors.
 
 ## Accessibility & SEO

@@ -24,12 +24,14 @@ import {
   Ruler,
   Weight,
   UserCheck,
-  Ban
+  Ban,
+  ShieldAlert
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
-import { 
-  getProfileDetails, 
+import { isDeactivated } from "@/lib/admin";
+import {
+  getProfileDetails,
   getMembershipDetails, 
   getBmiDetails,
   updateBmiDetails,
@@ -70,7 +72,7 @@ interface HealthSetupFormProps {
   displayName: string | null;
 }
 
-function HealthSetupForm({ onComplete, uid, email, displayName }: HealthSetupFormProps) {
+function HealthSetupForm({ onComplete, uid, displayName }: HealthSetupFormProps) {
   const [step, setStep] = useState(1); // 1 = personal, 2 = body metrics
   const [saving, setSaving] = useState(false);
 
@@ -418,6 +420,26 @@ export function ProfileClient() {
     </div>
   );
 
+  // An admin has removed this account. The Firebase Auth login still works
+  // (revoking it needs the Admin SDK), so the app refuses the session here.
+  if (isDeactivated(profile)) return (
+    <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 px-6 text-center">
+      <div className="rounded-full border border-rose-500/20 bg-rose-500/5 p-5 text-rose-400">
+        <ShieldAlert className="size-12" />
+      </div>
+      <div className="max-w-md space-y-2">
+        <h1 className="font-heading text-3xl font-bold tracking-wider text-steel">Account Deactivated</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          This membership account has been closed by gym administration. Please
+          contact the front desk if you believe this is a mistake.
+        </p>
+      </div>
+      {/* Inlined rather than reusing handleLogout — that const is declared
+          below this early return and would be in the temporal dead zone. */}
+      <Button onClick={async () => { await logout(); router.push("/"); }}>Sign Out</Button>
+    </div>
+  );
+
   // ── Derived flags ──────────────────────────────────────────────────────────
   const hasMembership  = membership.planId !== "none" && membership.planId !== "";
   const hasBmiData     = bmi.heightCm > 0 && bmi.weightKg > 0;
@@ -434,7 +456,7 @@ export function ProfileClient() {
   const isExpiringSoon = hasMembership && daysRemaining > 0 && daysRemaining <= 7;
 
   let statusText  = hasMembership ? "Active" : "No Plan";
-  let statusColor = hasMembership
+  const statusColor = hasMembership
     ? (isExpired ? "border-rose-500/20 bg-rose-500/5 text-rose-400" : isExpiringSoon ? "border-amber-500/20 bg-amber-500/5 text-amber-400" : "border-emerald-500/20 bg-emerald-500/5 text-emerald-400")
     : "border-white/10 bg-white/5 text-muted-foreground";
   if (isExpired) statusText = "Expired";

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { 
   Search, 
@@ -8,20 +8,25 @@ import {
   Download, 
   Eye, 
   Edit2, 
-  RefreshCw, 
   UserMinus, 
   Trash2, 
   Loader2, 
   UserPlus, 
-  CheckCircle,
   AlertTriangle,
   Package
 } from "lucide-react";
-import { collection, getDocs, doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isListableMember } from "@/lib/admin";
+import { calculateBmi } from "@/lib/bmi";
+import {
+  createMemberAccount,
+  deleteMemberAccount,
+  purgeAllMemberAccounts,
+  AdminApiError,
+} from "@/lib/admin-api";
+import type { UserRecord, MembershipRecord, BmiReportRecord } from "@/types/firestore";
 import { 
-  getProfileDetails, 
-  getMembershipDetails,
   type UserProfileDetails,
   type UserMembership
 } from "@/lib/profile-db";
@@ -29,14 +34,13 @@ import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/shared/avatar";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { 
   Dialog, 
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogDescription,
-  DialogClose
+  DialogDescription
 } from "@/components/ui/dialog";
 
 // Plan model from Firestore plans_models collection
@@ -85,6 +89,8 @@ export default function AdminMembersPage() {
   const [loading, setLoading] = useState(true);
   const [gymPlans, setGymPlans] = useState<GymPlan[]>([]); // Dynamic plans from Firestore
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
+  /** One-time password-setup link for a member who was just created. */
+  const [newMemberLink, setNewMemberLink] = useState<string | null>(null);
 
   // Search & Filter state
   const [search, setSearch] = useState("");
@@ -140,14 +146,14 @@ export default function AdminMembersPage() {
     months: "3",
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setFirestoreError(null);
     try {
       let uids: string[] = [];
-      let rawProfiles: Record<string, any> = {};
-      let rawMemberships: Record<string, any> = {};
-      let rawBmiHistory: Record<string, any> = {};
+      let rawProfiles: Record<string, UserRecord> = {};
+      let rawMemberships: Record<string, MembershipRecord> = {};
+      let rawBmiHistory: Record<string, BmiReportRecord[]> = {};
       let fetchedPlans: GymPlan[] = [];
 
       if (db) {
@@ -155,10 +161,8 @@ export default function AdminMembersPage() {
           // Fetch profiles
           const usersSnap = await getDocs(collection(db, "users"));
           usersSnap.forEach((doc) => {
-            const data = doc.data();
-            const email = (data.email || "").toLowerCase();
-            const isUserAdmin = data.role === "admin" || email === "admin@royalfitness.com";
-            if (!isUserAdmin) {
+            const data = doc.data() as UserRecord;
+            if (isListableMember(data)) {
               uids.push(doc.id);
               rawProfiles[doc.id] = data;
             }
@@ -167,13 +171,13 @@ export default function AdminMembersPage() {
           // Fetch memberships
           const membershipsSnap = await getDocs(collection(db, "memberships"));
           membershipsSnap.forEach((doc) => {
-            rawMemberships[doc.id] = doc.data();
+            rawMemberships[doc.id] = doc.data() as MembershipRecord;
           });
 
           // Fetch BMI logs
           const bmiSnap = await getDocs(collection(db, "bmi_reports"));
           bmiSnap.forEach((doc) => {
-            const data = doc.data();
+            const data = doc.data() as BmiReportRecord;
             if (!rawBmiHistory[data.uid]) {
               rawBmiHistory[data.uid] = [];
             }
@@ -185,10 +189,12 @@ export default function AdminMembersPage() {
           plansSnap.forEach((doc) => {
             fetchedPlans.push(doc.data() as GymPlan);
           });
-        } catch (e: any) {
+        } catch (e: unknown) {
           console.error("Firestore error reading members list:", e);
           // Check if it's a permission error specifically
-          if (e?.code === "permission-denied" || e?.message?.includes("permission")) {
+          const code = e && typeof e === "object" && "code" in e ? String(e.code) : "";
+          const message = e instanceof Error ? e.message : "";
+          if (code === "permission-denied" || message.includes("permission")) {
             setFirestoreError(
               "Firestore access denied. Please update your Firestore Security Rules in Firebase Console to allow admin reads. " +
               "Go to: Firebase Console → Firestore → Rules, and publish the rules from firestore.rules file."
@@ -296,7 +302,7 @@ export default function AdminMembersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   const loadLocalDataFallback = () => {
     const isBrowser = typeof window !== "undefined";
@@ -305,9 +311,9 @@ export default function AdminMembersPage() {
     const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
     const uids = JSON.parse(uidsJson) as string[];
     
-    const rawProfiles: Record<string, any> = {};
-    const rawMemberships: Record<string, any> = {};
-    const rawBmiHistory: Record<string, any> = {};
+    const rawProfiles: Record<string, UserRecord> = {};
+    const rawMemberships: Record<string, MembershipRecord> = {};
+    const rawBmiHistory: Record<string, BmiReportRecord[]> = {};
 
     uids.forEach((uid) => {
       const p = localStorage.getItem(`rf_profile_${uid}`);
@@ -324,7 +330,7 @@ export default function AdminMembersPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const getPastDateStr = (daysAgo: number) => {
     const d = new Date();
@@ -332,14 +338,10 @@ export default function AdminMembersPage() {
     return d.toISOString().split("T")[0];
   };
 
-  const getFutureDateStr = (daysAhead: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    return d.toISOString().split("T")[0];
-  };
 
   // Open Create Member modal
   const openCreateModal = () => {
+    setNewMemberLink(null);
     const defaultPlan = gymPlans[0] || { id: "weight-training", price: 4500, duration: "3 Months" };
     setNewMemberForm({
       fullName: "",
@@ -362,12 +364,11 @@ export default function AdminMembersPage() {
   const handleCreateMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const uid = `member_${Date.now()}`;
       const membershipId = `RF-${Math.floor(10000 + Math.random() * 90000)}`;
       const joiningDate = newMemberForm.joiningDate || new Date().toISOString().split("T")[0];
       const durationMonths = parseInt(newMemberForm.durationMonths) || 3;
       const pricePaid = parseFloat(newMemberForm.pricePaid) || 0;
-      
+
       const startDate = joiningDate;
       const endD = new Date(startDate);
       endD.setMonth(endD.getMonth() + durationMonths);
@@ -377,28 +378,9 @@ export default function AdminMembersPage() {
 
       const parsedHeight = parseFloat(newMemberForm.heightCm) || 0;
       const parsedWeight = parseFloat(newMemberForm.weightKg) || 0;
-      let bmiScore = 0;
-      if (parsedHeight > 0 && parsedWeight > 0) {
-        const hm = parsedHeight / 100;
-        bmiScore = Math.round((parsedWeight / (hm * hm)) * 10) / 10;
-      }
-
-      const userProfile: UserProfileDetails = {
-        uid,
-        fullName: newMemberForm.fullName,
-        email: newMemberForm.email,
-        phoneNumber: newMemberForm.phoneNumber,
-        joiningDate,
-        membershipId,
-        gender: newMemberForm.gender,
-        age: parseInt(newMemberForm.age) || 24,
-        photoURL: null,
-        role: "member",
-        status: "Active",
-        ...(parsedHeight > 0 && { heightCm: parsedHeight }),
-        ...(parsedWeight > 0 && { weightKg: parsedWeight }),
-        ...(bmiScore > 0 && { bmiScore })
-      };
+      const bmi = parsedHeight > 0 && parsedWeight > 0
+        ? calculateBmi(parsedHeight, parsedWeight)
+        : null;
 
       const userMembership: UserMembership = {
         planId: newMemberForm.planId,
@@ -410,12 +392,28 @@ export default function AdminMembersPage() {
         status: "Active"
       };
 
+      let uid: string;
+      let passwordResetLink: string | null = null;
+
       if (db) {
-        // 1. Write user profile
-        await setDoc(doc(db, "users", uid), userProfile);
-        // 2. Write membership
-        await setDoc(doc(db, "memberships", uid), userMembership);
-        // 3. Write payment
+        // The server creates the Firebase Auth account and writes the profile
+        // and membership under the same uid — the client SDK cannot create an
+        // account for someone else without hijacking the admin's own session.
+        const created = await createMemberAccount({
+          fullName: newMemberForm.fullName,
+          email: newMemberForm.email,
+          phoneNumber: newMemberForm.phoneNumber,
+          gender: newMemberForm.gender,
+          age: parseInt(newMemberForm.age) || 24,
+          joiningDate,
+          ...(parsedHeight > 0 && { heightCm: parsedHeight }),
+          ...(parsedWeight > 0 && { weightKg: parsedWeight }),
+          membership: userMembership,
+        });
+        uid = created.uid;
+        passwordResetLink = created.passwordResetLink;
+
+        // Payment and BMI records are ordinary admin writes, allowed by rules.
         if (pricePaid > 0) {
           const invId = `INV-${Date.now().toString().slice(-6)}`;
           await setDoc(doc(db, "payments", invId), {
@@ -427,34 +425,40 @@ export default function AdminMembersPage() {
             date: joiningDate
           });
         }
-        // 4. Write BMI record if entered
-        if (bmiScore > 0) {
-          let category: "Underweight" | "Normal" | "Overweight" | "Obese" = "Normal";
-          if (bmiScore < 18.5) category = "Underweight";
-          else if (bmiScore < 25) category = "Normal";
-          else if (bmiScore < 30) category = "Overweight";
-          else category = "Obese";
 
-          await setDoc(doc(db, "bmi", uid), {
+        if (bmi) {
+          const bmiRecord = {
             uid,
             heightCm: parsedHeight,
             weightKg: parsedWeight,
-            bmiScore,
-            category,
+            bmiScore: bmi.bmi,
+            category: bmi.category,
             calculatedAt: joiningDate
-          });
-
-          await setDoc(doc(db, "bmi_reports", `${uid}_${joiningDate}`), {
-            uid,
-            heightCm: parsedHeight,
-            weightKg: parsedWeight,
-            bmiScore,
-            category,
-            calculatedAt: joiningDate
-          });
+          };
+          await setDoc(doc(db, "bmi", uid), bmiRecord);
+          await setDoc(doc(db, "bmi_reports", `${uid}_${joiningDate}`), bmiRecord);
         }
       } else {
-        // LocalStorage fallback
+        // Mock mode (no Firebase configured) — records only, no real login.
+        uid = `local_${Date.now()}`;
+
+        const userProfile: UserProfileDetails = {
+          uid,
+          fullName: newMemberForm.fullName,
+          email: newMemberForm.email,
+          phoneNumber: newMemberForm.phoneNumber,
+          joiningDate,
+          membershipId,
+          gender: newMemberForm.gender,
+          age: parseInt(newMemberForm.age) || 24,
+          photoURL: null,
+          role: "member",
+          status: "Active",
+          ...(parsedHeight > 0 && { heightCm: parsedHeight }),
+          ...(parsedWeight > 0 && { weightKg: parsedWeight }),
+          ...(bmi && { bmiScore: bmi.bmi })
+        };
+
         const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
         const uids = JSON.parse(uidsJson) as string[];
         uids.push(uid);
@@ -477,19 +481,13 @@ export default function AdminMembersPage() {
           localStorage.setItem("rf_payments", JSON.stringify(payments));
         }
 
-        if (bmiScore > 0) {
-          let category = "Normal";
-          if (bmiScore < 18.5) category = "Underweight";
-          else if (bmiScore < 25) category = "Normal";
-          else if (bmiScore < 30) category = "Overweight";
-          else category = "Obese";
-
+        if (bmi) {
           const bmiObj = {
             uid,
             heightCm: parsedHeight,
             weightKg: parsedWeight,
-            bmiScore,
-            category,
+            bmiScore: bmi.bmi,
+            category: bmi.category,
             calculatedAt: joiningDate
           };
           localStorage.setItem(`rf_bmi_${uid}`, JSON.stringify(bmiObj));
@@ -497,14 +495,24 @@ export default function AdminMembersPage() {
         }
       }
 
-      showToast(`Member ${newMemberForm.fullName} registered successfully!`, "success");
-      setModals((m) => ({ ...m, create: false }));
+      setNewMemberLink(passwordResetLink);
+      showToast(
+        passwordResetLink
+          ? `${newMemberForm.fullName} registered. Share the password setup link to activate their login.`
+          : `${newMemberForm.fullName} registered successfully!`,
+        "success"
+      );
+      if (!passwordResetLink) setModals((m) => ({ ...m, create: false }));
       loadData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to register member.", "error");
+      showToast(
+        err instanceof AdminApiError ? err.message : "Failed to register member.",
+        "error"
+      );
     }
   };
+
 
   // Trigger actions
   const openEditModal = (member: CompiledMember) => {
@@ -538,7 +546,7 @@ export default function AdminMembersPage() {
       const bmiScore = calculateBmiScore(parsedHeight, parsedWeight);
 
       // Check current profile
-      let rawProfile: any = {};
+      let rawProfile: Partial<UserRecord> = {};
       if (db) {
         const snap = await getDoc(doc(db, "users", selectedMember.uid));
         rawProfile = snap.exists() ? snap.data() : {};
@@ -564,22 +572,14 @@ export default function AdminMembersPage() {
         
         // Write to BMI reports history
         const repId = `${selectedMember.uid}_${new Date().toISOString().split("T")[0]}`;
-        const calculateBmiDetails = (h: number, w: number) => {
-          const rounded = bmiScore;
-          let category = "Normal";
-          if (rounded < 18.5) category = "Underweight";
-          else if (rounded < 25) category = "Normal";
-          else if (rounded < 30) category = "Overweight";
-          else category = "Obese";
-          return { rounded, category };
-        };
-        const bmiDet = calculateBmiDetails(parsedHeight, parsedWeight);
+        // Shared helper keeps the category thresholds in one place.
+        const bmiDet = calculateBmi(parsedHeight, parsedWeight);
         await setDoc(doc(db, "bmi_reports", repId), {
           uid: selectedMember.uid,
           heightCm: parsedHeight,
           weightKg: parsedWeight,
           calculatedAt: new Date().toISOString().split("T")[0],
-          bmiScore: bmiDet.rounded,
+          bmiScore: bmiDet.bmi,
           category: bmiDet.category
         });
 
@@ -589,22 +589,14 @@ export default function AdminMembersPage() {
         // LocalStorage BMI history list
         const bmiHistoryJson = localStorage.getItem(`rf_bmi_history_${selectedMember.uid}`) || "[]";
         const bmiHistory = JSON.parse(bmiHistoryJson);
-        const calculateBmiDetails = (h: number, w: number) => {
-          const rounded = bmiScore;
-          let category = "Normal";
-          if (rounded < 18.5) category = "Underweight";
-          else if (rounded < 25) category = "Normal";
-          else if (rounded < 30) category = "Overweight";
-          else category = "Obese";
-          return { rounded, category };
-        };
-        const bmiDet = calculateBmiDetails(parsedHeight, parsedWeight);
+        // Shared helper keeps the category thresholds in one place.
+        const bmiDet = calculateBmi(parsedHeight, parsedWeight);
         bmiHistory.push({
           uid: selectedMember.uid,
           heightCm: parsedHeight,
           weightKg: parsedWeight,
           calculatedAt: new Date().toISOString().split("T")[0],
-          bmiScore: bmiDet.rounded,
+          bmiScore: bmiDet.bmi,
           category: bmiDet.category
         });
         localStorage.setItem(`rf_bmi_history_${selectedMember.uid}`, JSON.stringify(bmiHistory));
@@ -707,7 +699,7 @@ export default function AdminMembersPage() {
 
   const handleToggleSuspend = async (member: CompiledMember) => {
     try {
-      let currentMembership: any = {};
+      let currentMembership: Partial<MembershipRecord> = {};
       if (db) {
         const snap = await getDoc(doc(db, "memberships", member.uid));
         currentMembership = snap.exists() ? snap.data() : {};
@@ -745,8 +737,10 @@ export default function AdminMembersPage() {
     if (!selectedMember) return;
     try {
       if (db) {
-        await deleteDoc(doc(db, "users", selectedMember.uid));
-        await deleteDoc(doc(db, "memberships", selectedMember.uid));
+        // Server-side: revokes the Firebase Auth login and removes every
+        // record. Deleting only the documents used to leave the login working,
+        // and the next sign-in silently re-created the profile.
+        await deleteMemberAccount(selectedMember.uid);
       } else {
         // LocalStorage delete
         const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
@@ -759,54 +753,35 @@ export default function AdminMembersPage() {
         localStorage.removeItem(`rf_bmi_history_${selectedMember.uid}`);
       }
 
-      showToast("Member deleted from database.", "success");
+      showToast("Member account and records permanently deleted.", "success");
       setModals((m) => ({ ...m, delete: false }));
       loadData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to delete member.", "error");
+      showToast(
+        err instanceof AdminApiError ? err.message : "Failed to delete member.",
+        "error"
+      );
     }
   };
 
   const handlePurgeAllMembers = async () => {
-    if (!confirm("Are you sure you want to delete ALL member accounts? Only admin accounts will be kept. This action cannot be undone.")) return;
+    if (!confirm("Permanently delete ALL member accounts and their records? Admin accounts are kept. This cannot be undone.")) return;
 
     setLoading(true);
     try {
       if (db) {
-        const usersSnap = await getDocs(collection(db, "users"));
-        const memberUidsToDelete: string[] = [];
-
-        usersSnap.forEach((docSnap) => {
-          const data = docSnap.data();
-          const email = (data.email || "").toLowerCase();
-          const isAdmin = data.role === "admin" || email.includes("admin") || email === "admin@royalfitness.com";
-          if (!isAdmin) {
-            memberUidsToDelete.push(docSnap.id);
-          }
-        });
-
-        for (const uid of memberUidsToDelete) {
-          await deleteDoc(doc(db, "users", uid));
-          await deleteDoc(doc(db, "memberships", uid));
+        const { deleted, failed } = await purgeAllMemberAccounts();
+        if (failed.length > 0) {
+          showToast(
+            `${deleted} member(s) deleted, ${failed.length} could not be removed.`,
+            "error"
+          );
+        } else {
+          showToast(`${deleted} member account(s) permanently deleted.`, "success");
         }
-
-        // Clean up linked collections
-        const collectionsToCheck = ["bmi_reports", "payments", "attendance"];
-        for (const colName of collectionsToCheck) {
-          const snap = await getDocs(collection(db, colName));
-          for (const d of snap.docs) {
-            const data = d.data();
-            const uid = data.uid || d.id;
-            if (memberUidsToDelete.includes(uid) || memberUidsToDelete.includes(d.id)) {
-              await deleteDoc(doc(db, colName, d.id));
-            }
-          }
-        }
-      }
-
-      // Clear localStorage member data
-      if (typeof window !== "undefined") {
+      } else {
+        // Clear localStorage member data
         const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
         const uids = JSON.parse(uidsJson) as string[];
         for (const uid of uids) {
@@ -815,13 +790,16 @@ export default function AdminMembersPage() {
           localStorage.removeItem(`rf_bmi_history_${uid}`);
         }
         localStorage.setItem("rf_member_uids", "[]");
+        showToast("All local member records cleared.", "success");
       }
 
-      showToast("All member accounts purged! Only Admin accounts remain.", "success");
       loadData();
     } catch (err) {
       console.error(err);
-      showToast("Failed to purge member accounts.", "error");
+      showToast(
+        err instanceof AdminApiError ? err.message : "Failed to purge member accounts.",
+        "error"
+      );
       setLoading(false);
     }
   };
@@ -1555,12 +1533,54 @@ export default function AdminMembersPage() {
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-royal hover:bg-royal-light text-white font-semibold font-heading h-12 mt-4"
-            >
-              Register Member & Activate Plan
-            </Button>
+            {newMemberLink ? (
+              /* Shown instead of the submit button once the account exists, so
+                 staff can hand over the setup link before closing the dialog. */
+              <div className="mt-4 space-y-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                  Account created — send this password setup link
+                </p>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  The link is single-use and expires. The member sets their own
+                  password with it; no temporary password is shared.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={newMemberLink}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="border-white/10 bg-white/[0.02] text-[11px]"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(newMemberLink);
+                      showToast("Setup link copied.", "success");
+                    }}
+                    className="shrink-0 bg-white/5 hover:bg-white/10 text-white"
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setNewMemberLink(null);
+                    setModals((m) => ({ ...m, create: false }));
+                  }}
+                  className="w-full bg-royal hover:bg-royal-light text-white font-semibold font-heading h-11"
+                >
+                  Done
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="submit"
+                className="w-full bg-royal hover:bg-royal-light text-white font-semibold font-heading h-12 mt-4"
+              >
+                Register Member &amp; Activate Plan
+              </Button>
+            )}
           </form>
         </DialogContent>
       </Dialog>

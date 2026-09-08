@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
   Activity, 
   Search, 
@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isListableMember } from "@/lib/admin";
+import type { UserRecord, BmiReportRecord } from "@/types/firestore";
 import { useToast } from "@/components/ui/toast";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/shared/avatar";
@@ -53,7 +55,7 @@ export default function AdminBmiReportsPage() {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<CompiledBmiRecord[]>([]);
-  const [allMembers, setAllMembers] = useState<any[]>([]);
+  const [allMembers, setAllMembers] = useState<UserRecord[]>([]);
 
   // Search & filter
   const [search, setSearch] = useState("");
@@ -68,11 +70,11 @@ export default function AdminBmiReportsPage() {
     date: new Date().toISOString().split("T")[0]
   });
 
-  const loadBmiDetails = async () => {
+  const loadBmiDetails = useCallback(async () => {
     setLoading(true);
     try {
-      let members: any[] = [];
-      let bmiLogs: any[] = [];
+      let members: UserRecord[] = [];
+      let bmiLogs: BmiReportRecord[] = [];
 
       if (db) {
         try {
@@ -80,27 +82,22 @@ export default function AdminBmiReportsPage() {
           const usersSnap = await getDocs(collection(db, "users"));
           usersSnap.forEach((doc) => {
             const data = doc.data();
-            const email = (data.email || "").toLowerCase();
-            const isUserAdmin = data.role === "admin" || email === "admin@royalfitness.com";
-            if (!isUserAdmin) {
-              members.push({ uid: doc.id, ...data });
+            if (isListableMember(data)) {
+              members.push({ ...(data as UserRecord), uid: doc.id });
             }
           });
 
           // Fetch BMI reports history
           const bmiSnap = await getDocs(collection(db, "bmi_reports"));
           bmiSnap.forEach((doc) => {
-            bmiLogs.push(doc.data());
+            bmiLogs.push(doc.data() as BmiReportRecord);
           });
 
           // Fetch direct BMI documents
           const directBmiSnap = await getDocs(collection(db, "bmi"));
           directBmiSnap.forEach((doc) => {
             const d = doc.data();
-            bmiLogs.push({
-              uid: doc.id,
-              ...d
-            });
+            bmiLogs.push({ ...(d as BmiReportRecord), uid: doc.id });
           });
         } catch (e) {
           console.warn("Firestore BMI logs read error, using local fallback:", e);
@@ -123,7 +120,7 @@ export default function AdminBmiReportsPage() {
           if (userLogs.length === 0 && m.heightCm && m.weightKg) {
             const hm = m.heightCm / 100;
             const score = m.bmiScore || Math.round((m.weightKg / (hm * hm)) * 10) / 10;
-            let cat = "Normal";
+            let cat: BmiReportRecord["category"] = "Normal";
             if (score < 18.5) cat = "Underweight";
             else if (score < 25) cat = "Normal";
             else if (score < 30) cat = "Overweight";
@@ -181,7 +178,7 @@ export default function AdminBmiReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   const loadLocalBmiLogsFallback = () => {
     const isBrowser = typeof window !== "undefined";
@@ -189,12 +186,12 @@ export default function AdminBmiReportsPage() {
 
     const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
     const uids = JSON.parse(uidsJson) as string[];
-    const members: any[] = [];
-    const bmiLogs: any[] = [];
+    const members: UserRecord[] = [];
+    const bmiLogs: BmiReportRecord[] = [];
 
     uids.forEach((uid) => {
       const cached = localStorage.getItem(`rf_profile_${uid}`);
-      if (cached) members.push(JSON.parse(cached));
+      if (cached) members.push(JSON.parse(cached) as UserRecord);
       
       const bHistoryJson = localStorage.getItem(`rf_bmi_history_${uid}`) || "[]";
       const bHistory = JSON.parse(bHistoryJson);
@@ -315,7 +312,7 @@ export default function AdminBmiReportsPage() {
 
   useEffect(() => {
     loadBmiDetails();
-  }, []);
+  }, [loadBmiDetails]);
 
   // Filter records
   const filteredRecords = records.filter((r) => {

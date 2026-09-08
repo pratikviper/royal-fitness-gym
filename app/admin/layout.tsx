@@ -21,6 +21,7 @@ import {
   Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { LucideIcon } from "lucide-react";
 import { AdminGuard } from "@/components/admin/admin-guard";
 import { Logo } from "@/components/shared/logo";
 import { useAuth } from "@/lib/auth-context";
@@ -31,7 +32,7 @@ import { LogoutConfirmationModal } from "@/components/profile/profile-modals";
 interface SidebarItem {
   label: string;
   href: string;
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
 }
 
 const sidebarItems: SidebarItem[] = [

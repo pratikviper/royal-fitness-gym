@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isAdminEmail, isAdminRecord, isDeactivated } from "@/lib/admin";
 import { Loader2, ShieldAlert } from "lucide-react";
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
@@ -25,42 +26,43 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
 
     const checkAdmin = async () => {
       setLoading(true);
-      
-      // Auto-grant access to admin emails as safety fallback
-      const isDefaultAdminEmail = !!(
-        user.email?.toLowerCase() === "admin@royalfitness.com" || 
-        user.email?.toLowerCase().includes("admin")
-      );
+
+      // The bootstrap admin address is the only email that grants access on its
+      // own — matched exactly. Anything looser (a substring like "admin") would
+      // hand the console to anyone who picks a matching signup email.
+      const isBootstrapAdmin = isAdminEmail(user.email);
 
       if (db) {
         try {
           const docRef = doc(db, "users", user.uid);
           const docSnap = await getDoc(docRef);
-          
+
           if (docSnap.exists()) {
             const data = docSnap.data();
-            const hasAdminRole = data.role === "admin" || isDefaultAdminEmail;
-            setIsAdmin(hasAdminRole);
+            // A deactivated account loses access even if it still holds a role.
+            setIsAdmin(!isDeactivated(data) && (isAdminRecord(data) || isBootstrapAdmin));
           } else {
-            // New user without document yet, check default email
-            setIsAdmin(isDefaultAdminEmail);
+            // No profile document yet — only the bootstrap address gets in.
+            setIsAdmin(isBootstrapAdmin);
           }
         } catch (e) {
-          console.warn("Firestore error checking admin role, falling back to email config:", e);
-          setIsAdmin(isDefaultAdminEmail);
+          // Deny on error. Firestore rules are the real boundary, so a failed
+          // role lookup must not fall open.
+          console.warn("Could not verify admin role, denying access:", e);
+          setIsAdmin(isBootstrapAdmin);
         }
       } else {
-        // LocalStorage fallback for mock mode
+        // LocalStorage fallback for mock mode (no Firebase configured).
         const cached = localStorage.getItem(`rf_profile_${user.uid}`);
         if (cached) {
           try {
             const details = JSON.parse(cached);
-            setIsAdmin(details.role === "admin" || isDefaultAdminEmail);
+            setIsAdmin(!isDeactivated(details) && (isAdminRecord(details) || isBootstrapAdmin));
           } catch {
-            setIsAdmin(isDefaultAdminEmail);
+            setIsAdmin(isBootstrapAdmin);
           }
         } else {
-          setIsAdmin(isDefaultAdminEmail);
+          setIsAdmin(isBootstrapAdmin);
         }
       }
       setLoading(false);

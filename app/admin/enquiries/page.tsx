@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
   MessageSquare, 
   Search, 
@@ -10,15 +10,14 @@ import {
   AlertTriangle,
   Mail,
   Phone,
-  Calendar,
-  CheckCircle2
+  Calendar
 } from "lucide-react";
 import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { 
   Dialog, 
   DialogContent, 
@@ -55,7 +54,7 @@ export default function AdminEnquiriesPage() {
     delete: false,
   });
 
-  const loadEnquiries = async () => {
+  const loadEnquiries = useCallback(async () => {
     setLoading(true);
     try {
       let temp: ContactEnquiry[] = [];
@@ -69,18 +68,8 @@ export default function AdminEnquiriesPage() {
               ...doc.data()
             } as ContactEnquiry);
           });
-
-          // Seed default enquiries if collection is empty
-          if (temp.length === 0) {
-            const defaults: ContactEnquiry[] = [
-              { id: "enq_1", name: "Rahul Deshmukh", email: "rahul.desh@gmail.com", phone: "+91 99887 76655", message: "Hi, I am interested in the All In One 6-month package. Are personal trainer fees included in it?", date: new Date().toISOString().split("T")[0], status: "Pending", reply: "" },
-              { id: "enq_2", name: "Meera Nair", email: "meera.nair@yahoo.com", phone: "+91 99112 23344", message: "Do you have a special ladies batch in the morning? What are the working hours?", date: new Date().toISOString().split("T")[0], status: "Replied", reply: "Hello Meera, yes, we have dedicated sessions and the gym is open from 6:00 AM to 10:00 PM. Check our Contact section." }
-            ];
-            for (const d of defaults) {
-              await setDoc(doc(db, "contact_enquiries", d.id), d);
-              temp.push(d);
-            }
-          }
+          // An empty collection means no one has written in yet — show the
+          // empty state rather than seeding fabricated enquiries.
         } catch (e) {
           console.warn("Firestore enquiries fetch error, using local fallback:", e);
           temp = loadLocalEnquiriesFallback();
@@ -96,7 +85,7 @@ export default function AdminEnquiriesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   const loadLocalEnquiriesFallback = () => {
     const isBrowser = typeof window !== "undefined";
@@ -107,21 +96,17 @@ export default function AdminEnquiriesPage() {
       try {
         return JSON.parse(cached) as ContactEnquiry[];
       } catch {
-        // Fallback below
+        // Malformed cache — fall through to the empty state.
       }
     }
 
-    const defaults: ContactEnquiry[] = [
-      { id: "enq_1", name: "Rahul Deshmukh", email: "rahul.desh@gmail.com", phone: "+91 99887 76655", message: "Hi, I am interested in the All In One 6-month package. Are personal trainer fees included in it?", date: new Date().toISOString().split("T")[0], status: "Pending", reply: "" },
-      { id: "enq_2", name: "Meera Nair", email: "meera.nair@yahoo.com", phone: "+91 99112 23344", message: "Do you have a special ladies batch in the morning? What are the working hours?", date: new Date().toISOString().split("T")[0], status: "Replied", reply: "Hello Meera, yes, we have dedicated sessions and the gym is open from 6:00 AM to 10:00 PM. Check our Contact section." }
-    ];
-    localStorage.setItem("rf_enquiries", JSON.stringify(defaults));
-    return defaults;
+    // No stored enquiries: show the empty state rather than inventing names.
+    return [];
   };
 
   useEffect(() => {
     loadEnquiries();
-  }, []);
+  }, [loadEnquiries]);
 
   const openReplyModal = (e: ContactEnquiry) => {
     setSelectedEnquiry(e);

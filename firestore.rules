@@ -1,57 +1,160 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // ─── Identity helpers ──────────────────────────────────────────────────
+    // Keep in lockstep with lib/admin.ts. Never loosen to a substring match on
+    // the email — signup emails are attacker-chosen.
+
+    function adminEmail() {
+      return "admin@royalfitness.com";
+    }
+
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.email == "admin@royalfitness.com" ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
-      );
+    function isSelf(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Phone-auth accounts carry no `email` claim, so read it defensively —
+    // calling .lower() on a missing claim errors the whole rule and denies the
+    // request outright.
+    function tokenEmail() {
+      return request.auth.token.get('email', '').lower();
+    }
+
+    // A brand-new account has no user document yet; get() on a missing document
+    // errors, so probe with exists() first (&& short-circuits).
+    function hasAdminRole() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == "admin";
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (tokenEmail() == adminEmail() || hasAdminRole());
+    }
+
+    // ─── Privilege-escalation guard ────────────────────────────────────────
+    // `role` decides admin access, so a member must never be able to write it
+    // to their own document. `status`/`deleted` back the admin soft-delete, so
+    // they are equally off-limits — otherwise a removed member un-deletes
+    // themselves. Compared with get(k, default) so legacy docs missing these
+    // fields still validate.
+
+    function preservesPrivilegedFields() {
+      return request.resource.data.get('role', null) == resource.data.get('role', null)
+          && request.resource.data.get('status', null) == resource.data.get('status', null)
+          && request.resource.data.get('deleted', false) == resource.data.get('deleted', false);
+    }
+
+    // A self-created profile may only ever start as a live, non-admin member.
+    function isSelfSeededProfile() {
+      return request.resource.data.get('role', 'member') == 'member'
+          && request.resource.data.get('deleted', false) == false;
+    }
+
+    // ─── Users ─────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read, write: if isAdmin();
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+
+      allow read:   if isSelf(userId);
+      allow create: if isSelf(userId) && isSelfSeededProfile();
+      allow update: if isSelf(userId) && preservesPrivilegedFields();
+      // Account removal is an admin action only (see admin soft-delete).
+      allow delete: if false;
     }
 
+    // ─── Memberships ───────────────────────────────────────────────────────
+    // Plans are assigned and priced by staff; members get read-only visibility.
     match /memberships/{userId} {
       allow read, write: if isAdmin();
-      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if isSelf(userId);
     }
 
+    // ─── BMI ───────────────────────────────────────────────────────────────
+    // Members record their own measurements.
     match /bmi/{userId} {
       allow read, write: if isAdmin();
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read, write: if isSelf(userId);
     }
 
     match /bmi_reports/{reportId} {
       allow read, write: if isAdmin();
-      allow read, write: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow read:   if isAuthenticated() && resource.data.uid == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      // History is append-only for members; only staff may revise it.
+      allow update, delete: if false;
     }
 
+    // ─── Payments ──────────────────────────────────────────────────────────
     match /payments/{paymentId} {
       allow read, write: if isAdmin();
       allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
     }
 
-    match /plans_models/{planId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
+    // ─── Attendance ────────────────────────────────────────────────────────
     match /attendance/{recordId} {
       allow read, write: if isAdmin();
       allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // ─── Catalogue ─────────────────────────────────────────────────────────
+    match /plans_models/{planId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
     match /trainers/{trainerId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
+
+    // ─── Gym settings ──────────────────────────────────────────────────────
+    match /settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ─── Contact enquiries ─────────────────────────────────────────────────
+    // The public contact form posts here unauthenticated, so creates are open
+    // but tightly shaped: no reading others' enquiries, no self-assigned
+    // status, and length caps so the endpoint can't be used as free storage.
+    match /contact_enquiries/{enquiryId} {
+      allow read, write: if isAdmin();
+
+      // Unauthenticated submissions from the public contact form.
+      allow create: if request.resource.data.keys().hasOnly(
+                         ['name', 'email', 'phone', 'interest', 'message', 'date', 'status', 'reply']
+                       )
+                    && request.resource.data.keys().hasAll(['name', 'email', 'message'])
+                    && request.resource.data.name    is string
+                    && request.resource.data.name.size()    >= 2
+                    && request.resource.data.name.size()    <= 100
+                    && request.resource.data.email   is string
+                    && request.resource.data.email.size()   <= 200
+                    && request.resource.data.message is string
+                    && request.resource.data.message.size() >= 10
+                    && request.resource.data.message.size() <= 2000
+                    && request.resource.data.get('status', 'Pending') == 'Pending'
+                    && request.resource.data.get('reply', '') == '';
+    }
+
+    // ─── Newsletter ────────────────────────────────────────────────────────
+    // The document id is the subscriber's address, so re-subscribing rewrites
+    // an existing document — that is an update, not a create. Both are allowed
+    // under the same shape constraints to keep opting in idempotent; the only
+    // thing an overwrite can change is the `date` on a record nobody but an
+    // admin can read.
+    match /newsletter_subscribers/{subscriberId} {
+      allow read, write: if isAdmin();
+
+      allow create, update: if request.resource.data.keys().hasOnly(['email', 'date'])
+                            && request.resource.data.email is string
+                            && request.resource.data.email.size() <= 200;
+    }
+
+    // Anything not matched above is denied by default.
   }
 }

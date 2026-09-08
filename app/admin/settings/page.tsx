@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
-  Settings, 
   Database, 
   Save, 
   Instagram, 
@@ -12,8 +11,6 @@ import {
   Phone, 
   Clock, 
   Loader2, 
-  CheckCircle,
-  HelpCircle,
   Building
 } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -25,7 +22,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 
-export default function AdminSettingsPage() {
+/** The single `settings/gym_settings` document. */
+interface GymSettings {
+  gymName: string;
+  logoText: string;
+  address: string;
+  contactNumber: string;
+  workingHours: string;
+  socialInstagram: string;
+  socialFacebook: string;
+  socialTwitter: string;
+}
+
+export default function 
+AdminSettingsPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
   
@@ -34,7 +44,7 @@ export default function AdminSettingsPage() {
   const [seeding, setSeeding] = useState(false);
 
   // Forms state
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<GymSettings>({
     gymName: "Royal Fitness Elite",
     logoText: "ROYAL FITNESS",
     address: "Royal Heights, 4th Floor, Sector 62, Noida, UP - 201301",
@@ -45,16 +55,16 @@ export default function AdminSettingsPage() {
     socialTwitter: "https://twitter.com/royalfitness",
   });
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
-      let data: any = null;
+      let data: GymSettings | null = null;
 
       if (db) {
         try {
           const snap = await getDoc(doc(db, "settings", "gym_settings"));
           if (snap.exists()) {
-            data = snap.data();
+            data = snap.data() as GymSettings;
           }
         } catch (e) {
           console.warn("Firestore error reading settings, using local fallback:", e);
@@ -82,7 +92,7 @@ export default function AdminSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   const loadLocalSettingsFallback = () => {
     const isBrowser = typeof window !== "undefined";
@@ -94,7 +104,7 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [loadSettings]);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();

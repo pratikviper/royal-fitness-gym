@@ -6,6 +6,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
+      // Private surfaces — no value in the index, and no reason to advertise
+      // the admin console to crawlers.
+      disallow: ["/admin", "/admin/", "/profile", "/login", "/signup"],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,

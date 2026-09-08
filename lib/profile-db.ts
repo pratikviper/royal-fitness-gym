@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "./firebase";
 import { calculateBmi } from "./bmi";
+import { stripPrivilegedFields } from "./admin";
 
 export interface UserProfileDetails {
   uid: string;
@@ -11,8 +12,13 @@ export interface UserProfileDetails {
   joiningDate: string; // YYYY-MM-DD
   membershipId: string; // RF-XXXXX
   photoURL?: string | null;
+  /** Admin-only. Never written by the client — see lib/admin.ts. */
   role?: string;
+  /** Admin-only. "Active" | "Deleted". */
   status?: string;
+  /** Admin-only tombstone set by the member purge; hides the account. */
+  deleted?: boolean;
+  deletedAt?: string;
   address?: string;
   dob?: string;
   emergencyContact?: string;
@@ -43,17 +49,6 @@ export interface UserBmiDetails {
 
 const isBrowser = typeof window !== "undefined";
 
-const getPastDateStr = (daysAgo: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().split("T")[0];
-};
-
-const getFutureDateStr = (daysAhead: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + daysAhead);
-  return d.toISOString().split("T")[0];
-};
 
 // Generates a random 5 digit membership ID
 const generateMembershipId = () => {
@@ -171,19 +166,21 @@ export async function getProfileDetails(
   return getDefaultProfile(uid, email, displayName, phoneNumber);
 }
 
-/** 2. FETCH MEMBERSHIP DETAILS */
+/**
+ * 2. FETCH MEMBERSHIP DETAILS
+ *
+ * Read-only for members: plans carry a price, so only staff may create one.
+ * A missing document means "no plan assigned yet" and is returned as an
+ * in-memory sentinel rather than written back (members cannot write here).
+ */
 export async function getMembershipDetails(uid: string): Promise<UserMembership> {
   if (db) {
     try {
-      const docRef = doc(db, "memberships", uid);
-      const docSnap = await getDoc(docRef);
+      const docSnap = await getDoc(doc(db, "memberships", uid));
       if (docSnap.exists()) {
         return docSnap.data() as UserMembership;
-      } else {
-        const defaultMembership = getDefaultMembership();
-        await setDoc(docRef, defaultMembership);
-        return defaultMembership;
       }
+      return getDefaultMembership();
     } catch (e) {
       console.warn("Error reading membership from Firestore, using localStorage fallback:", e);
     }
@@ -198,27 +195,26 @@ export async function getMembershipDetails(uid: string): Promise<UserMembership>
         // Ignore JSON error
       }
     }
-    const defaultMembership = getDefaultMembership();
-    localStorage.setItem(`rf_membership_${uid}`, JSON.stringify(defaultMembership));
-    return defaultMembership;
   }
 
   return getDefaultMembership();
 }
 
-/** 3. FETCH BMI DETAILS */
+/**
+ * 3. FETCH BMI DETAILS
+ *
+ * A missing document means "not measured yet"; the zero sentinel is returned
+ * in memory so the profile page shows the first-time setup form without
+ * writing a meaningless empty record.
+ */
 export async function getBmiDetails(uid: string): Promise<UserBmiDetails> {
   if (db) {
     try {
-      const docRef = doc(db, "bmi", uid);
-      const docSnap = await getDoc(docRef);
+      const docSnap = await getDoc(doc(db, "bmi", uid));
       if (docSnap.exists()) {
         return docSnap.data() as UserBmiDetails;
-      } else {
-        const defaultBmi = getDefaultBmi();
-        await setDoc(docRef, defaultBmi);
-        return defaultBmi;
       }
+      return getDefaultBmi();
     } catch (e) {
       console.warn("Error reading BMI from Firestore, using localStorage fallback:", e);
     }
@@ -233,15 +229,21 @@ export async function getBmiDetails(uid: string): Promise<UserBmiDetails> {
         // Ignore JSON error
       }
     }
-    const defaultBmi = getDefaultBmi();
-    localStorage.setItem(`rf_bmi_${uid}`, JSON.stringify(defaultBmi));
-    return defaultBmi;
   }
 
   return getDefaultBmi();
 }
 
-/** 4. UPDATE PROFILE DETAILS */
+/**
+ * 4. UPDATE PROFILE DETAILS
+ *
+ * Writes only the member-editable fields. `role`/`status`/`deleted` are never
+ * included — sending them back would let a member escalate to admin, and the
+ * Firestore rules reject such a write anyway.
+ *
+ * Throws if the write fails so callers can surface a real error instead of
+ * showing the user data that was never saved.
+ */
 export async function updateProfileDetails(
   uid: string,
   fullName: string,
@@ -250,8 +252,8 @@ export async function updateProfileDetails(
 ): Promise<UserProfileDetails> {
   // Fetch first to get joiningDate, email, membershipId
   const current = await getProfileDetails(uid);
-  const updated: UserProfileDetails = {
-    ...current,
+
+  const editable = {
     fullName,
     phoneNumber,
     ...(extras?.age !== undefined && { age: extras.age }),
@@ -259,13 +261,11 @@ export async function updateProfileDetails(
     ...(extras?.dob && { dob: extras.dob }),
   };
 
+  const updated: UserProfileDetails = { ...current, ...editable };
+
   if (db) {
-    try {
-      const docRef = doc(db, "users", uid);
-      await setDoc(docRef, updated, { merge: true });
-    } catch (e) {
-      console.error("Error writing profile to Firestore:", e);
-    }
+    // Only the editable subset goes to Firestore, never the whole document.
+    await setDoc(doc(db, "users", uid), stripPrivilegedFields(editable), { merge: true });
   }
 
   if (isBrowser) {
@@ -293,32 +293,26 @@ export async function updateBmiDetails(
   };
 
   if (db) {
-    try {
-      // 1. Write to bmi document
-      const docRef = doc(db, "bmi", uid);
-      await setDoc(docRef, updated);
+    // 1. Write to bmi document
+    await setDoc(doc(db, "bmi", uid), updated);
 
-      // 2. Also log entry to bmi_reports for historical progression
-      const reportId = `${uid}_${Date.now()}`;
-      await setDoc(doc(db, "bmi_reports", reportId), {
-        uid,
-        weightKg,
-        heightCm,
-        bmiScore: result.bmi,
-        category: result.category,
-        calculatedAt: todayStr,
-      });
+    // 2. Also log entry to bmi_reports for historical progression
+    const reportId = `${uid}_${Date.now()}`;
+    await setDoc(doc(db, "bmi_reports", reportId), {
+      uid,
+      weightKg,
+      heightCm,
+      bmiScore: result.bmi,
+      category: result.category,
+      calculatedAt: todayStr,
+    });
 
-      // 3. Update user profile document
-      const userRef = doc(db, "users", uid);
-      await setDoc(userRef, {
-        heightCm,
-        weightKg,
-        bmiScore: result.bmi
-      }, { merge: true });
-    } catch (e) {
-      console.error("Error writing BMI to Firestore:", e);
-    }
+    // 3. Mirror the latest figures onto the user profile
+    await setDoc(
+      doc(db, "users", uid),
+      { heightCm, weightKg, bmiScore: result.bmi },
+      { merge: true }
+    );
   }
 
   if (isBrowser) {
@@ -353,26 +347,25 @@ export async function updateBmiDetails(
   return updated;
 }
 
-/** 6. RENEW MEMBERSHIP */
+/**
+ * 6. ASSIGN / RENEW A MEMBERSHIP — STAFF ONLY.
+ *
+ * Grants a paid plan, so Firestore rules restrict `memberships` writes to
+ * admins. Members must not call this: a self-service path here would let
+ * anyone hand themselves an unpaid membership. Member-initiated renewals go
+ * through `requestMembershipRenewal` below instead.
+ */
 export async function renewMembershipPlan(
   uid: string,
   planId: string,
   planName: string,
   durationMonths: number,
-  pricePaid: number,
-  setExpiredState = false // Optional test helper
+  pricePaid: number
 ): Promise<UserMembership> {
   const startDate = new Date().toISOString().split("T")[0];
-  
-  let endDate: string;
-  if (setExpiredState) {
-    // End date is in the past for testing expired warning
-    endDate = getPastDateStr(2);
-  } else {
-    const end = new Date();
-    end.setMonth(end.getMonth() + durationMonths);
-    endDate = end.toISOString().split("T")[0];
-  }
+  const end = new Date();
+  end.setMonth(end.getMonth() + durationMonths);
+  const endDate = end.toISOString().split("T")[0];
 
   const updated: UserMembership = {
     planId,
@@ -381,15 +374,11 @@ export async function renewMembershipPlan(
     endDate,
     durationMonths,
     pricePaid,
+    status: "Active",
   };
 
   if (db) {
-    try {
-      const docRef = doc(db, "memberships", uid);
-      await setDoc(docRef, updated);
-    } catch (e) {
-      console.error("Error writing membership to Firestore:", e);
-    }
+    await setDoc(doc(db, "memberships", uid), updated);
   }
 
   if (isBrowser) {
@@ -397,6 +386,29 @@ export async function renewMembershipPlan(
   }
 
   return updated;
+}
+
+/**
+ * Member-initiated renewal. Files an enquiry for staff to price and collect
+ * payment against — it deliberately does NOT grant the plan.
+ */
+export async function requestMembershipRenewal(details: {
+  name: string;
+  email: string;
+  phone: string;
+  planName: string;
+  durationMonths: number;
+}): Promise<void> {
+  const { submitContactEnquiry } = await import("./enquiries");
+  await submitContactEnquiry({
+    name: details.name,
+    email: details.email,
+    phone: details.phone,
+    interest: "Membership",
+    message:
+      `Membership renewal request: ${details.planName} ` +
+      `(${details.durationMonths} months). Please confirm pricing and collect payment.`,
+  });
 }
 
 /** 7. UPLOAD PROFILE PHOTO */
@@ -452,12 +464,8 @@ export async function uploadUserProfilePhoto(
   };
 
   if (db) {
-    try {
-      const docRef = doc(db, "users", uid);
-      await setDoc(docRef, updated, { merge: true });
-    } catch (e) {
-      console.error("Error updating profile photoURL in Firestore:", e);
-    }
+    // Write only the changed field — never echo back the whole document.
+    await setDoc(doc(db, "users", uid), { photoURL }, { merge: true });
   }
 
   if (isBrowser) {
@@ -516,12 +524,7 @@ export async function deleteUserProfilePhoto(uid: string): Promise<void> {
 
   // 1. Update Firestore if configured
   if (db) {
-    try {
-      const docRef = doc(db, "users", uid);
-      await setDoc(docRef, updated, { merge: true });
-    } catch (e) {
-      console.error("Error clearing photoURL in Firestore:", e);
-    }
+    await setDoc(doc(db, "users", uid), { photoURL: null }, { merge: true });
   }
 
   // 2. Delete from Firebase Storage if it's a cloud storage URL

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { use, useEffect, useState } from "react";
+import React, { use, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -9,23 +9,24 @@ import {
   Phone, 
   MapPin, 
   Calendar, 
-  Clock, 
   Activity, 
   TrendingUp, 
   CreditCard,
-  CheckCircle,
   AlertTriangle,
   Loader2,
-  FileText,
-  Weight,
   Layers,
   Sparkles
 } from "lucide-react";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import type {
+  UserRecord,
+  MembershipRecord,
+  BmiReportRecord,
+  PaymentRecord,
+  AttendanceRecord,
+} from "@/types/firestore";
 import { 
-  getProfileDetails, 
-  getMembershipDetails,
   type UserProfileDetails,
   type UserMembership,
   type UserBmiDetails
@@ -37,12 +38,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RenewMembershipModal } from "@/components/profile/profile-modals";
 
-interface MemberProgressPoint {
-  date: string;
-  weight: number;
-  bmi: number;
-}
-
 export default function MemberProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -52,20 +47,37 @@ export default function MemberProfilePage({ params }: { params: Promise<{ id: st
   const [profile, setProfile] = useState<UserProfileDetails | null>(null);
   const [membership, setMembership] = useState<UserMembership | null>(null);
   const [bmiHistory, setBmiHistory] = useState<UserBmiDetails[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
-  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([]);
+  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
 
   // Renew modal trigger
   const [renewOpen, setRenewOpen] = useState(false);
 
-  const loadMemberDetails = async () => {
+  const loadLocalDetailsFallback = useCallback(() => {
+    const isBrowser = typeof window !== "undefined";
+    if (!isBrowser) return { p: null, m: null, bLogs: [], payLogs: [], attLogs: [] };
+
+    const pCached = localStorage.getItem(`rf_profile_${memberId}`);
+    const mCached = localStorage.getItem(`rf_membership_${memberId}`);
+    
+    const p = pCached ? JSON.parse(pCached) : null;
+    const m = mCached ? JSON.parse(mCached) : null;
+
+    const bmiHistory = JSON.parse(localStorage.getItem(`rf_bmi_history_${memberId}`) || "[]");
+    const payments = JSON.parse(localStorage.getItem("rf_payments") || "[]").filter((x: PaymentRecord) => x.uid === memberId);
+    const attendance = JSON.parse(localStorage.getItem("rf_attendance") || "[]").filter((x: AttendanceRecord) => x.uid === memberId);
+
+    return { p, m, bLogs: bmiHistory, payLogs: payments, attLogs: attendance };
+  }, [memberId]);
+
+  const loadMemberDetails = useCallback(async () => {
     setLoading(true);
     try {
-      let p: any = null;
-      let m: any = null;
-      let bLogs: any[] = [];
-      let payLogs: any[] = [];
-      let attLogs: any[] = [];
+      let p: UserRecord | null = null;
+      let m: MembershipRecord | null = null;
+      let bLogs: BmiReportRecord[] = [];
+      let payLogs: PaymentRecord[] = [];
+      let attLogs: AttendanceRecord[] = [];
 
       if (db) {
         try {
@@ -73,20 +85,20 @@ export default function MemberProfilePage({ params }: { params: Promise<{ id: st
           const docRef = doc(db, "users", memberId);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
-            p = docSnap.data();
+            p = docSnap.data() as UserRecord;
           }
 
           // Fetch Membership
           const mRef = doc(db, "memberships", memberId);
           const mSnap = await getDoc(mRef);
           if (mSnap.exists()) {
-            m = mSnap.data();
+            m = mSnap.data() as MembershipRecord;
           }
 
           // Fetch BMI
           const bmiSnap = await getDocs(collection(db, "bmi_reports"));
           bmiSnap.forEach((doc) => {
-            const data = doc.data();
+            const data = doc.data() as BmiReportRecord;
             if (data.uid === memberId) {
               bLogs.push(data);
             }
@@ -96,7 +108,7 @@ export default function MemberProfilePage({ params }: { params: Promise<{ id: st
           try {
             const directBmiSnap = await getDoc(doc(db, "bmi", memberId));
             if (directBmiSnap.exists()) {
-              const dData = directBmiSnap.data();
+              const dData = { ...directBmiSnap.data(), uid: memberId } as BmiReportRecord;
               if (!bLogs.some((l) => l.calculatedAt === dData.calculatedAt)) {
                 bLogs.push(dData);
               }
@@ -107,13 +119,14 @@ export default function MemberProfilePage({ params }: { params: Promise<{ id: st
           if (bLogs.length === 0 && p && p.heightCm && p.weightKg) {
             const hm = p.heightCm / 100;
             const score = p.bmiScore || Math.round((p.weightKg / (hm * hm)) * 10) / 10;
-            let cat = "Normal";
+            let cat: BmiReportRecord["category"] = "Normal";
             if (score < 18.5) cat = "Underweight";
             else if (score < 25) cat = "Normal";
             else if (score < 30) cat = "Overweight";
             else cat = "Obese";
 
             bLogs.push({
+              uid: memberId,
               heightCm: p.heightCm,
               weightKg: p.weightKg,
               bmiScore: score,
@@ -125,7 +138,7 @@ export default function MemberProfilePage({ params }: { params: Promise<{ id: st
           // Fetch Payments
           const paymentsSnap = await getDocs(collection(db, "payments"));
           paymentsSnap.forEach((doc) => {
-            const data = doc.data();
+            const data = doc.data() as PaymentRecord;
             if (data.uid === memberId) {
               payLogs.push(data);
             }
@@ -134,7 +147,7 @@ export default function MemberProfilePage({ params }: { params: Promise<{ id: st
           // Fetch Attendance
           const attendanceSnap = await getDocs(collection(db, "attendance"));
           attendanceSnap.forEach((doc) => {
-            const data = doc.data();
+            const data = doc.data() as AttendanceRecord;
             if (data.uid === memberId) {
               attLogs.push(data);
             }
@@ -167,28 +180,11 @@ export default function MemberProfilePage({ params }: { params: Promise<{ id: st
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadLocalDetailsFallback = () => {
-    const isBrowser = typeof window !== "undefined";
-    if (!isBrowser) return { p: null, m: null, bLogs: [], payLogs: [], attLogs: [] };
-
-    const pCached = localStorage.getItem(`rf_profile_${memberId}`);
-    const mCached = localStorage.getItem(`rf_membership_${memberId}`);
-    
-    const p = pCached ? JSON.parse(pCached) : null;
-    const m = mCached ? JSON.parse(mCached) : null;
-
-    const bmiHistory = JSON.parse(localStorage.getItem(`rf_bmi_history_${memberId}`) || "[]");
-    const payments = JSON.parse(localStorage.getItem("rf_payments") || "[]").filter((x: any) => x.uid === memberId);
-    const attendance = JSON.parse(localStorage.getItem("rf_attendance") || "[]").filter((x: any) => x.uid === memberId);
-
-    return { p, m, bLogs: bmiHistory, payLogs: payments, attLogs: attendance };
-  };
+  }, [showToast, memberId, router, loadLocalDetailsFallback]);
 
   useEffect(() => {
     loadMemberDetails();
-  }, [memberId]);
+  }, [loadMemberDetails]);
 
   if (loading || !profile) {
     return (
@@ -236,7 +232,6 @@ export default function MemberProfilePage({ params }: { params: Promise<{ id: st
 
   // Latest BMI calculations
   const latestBmi = bmiHistory[bmiHistory.length - 1] || null;
-  const previousBmi = bmiHistory.length > 1 ? bmiHistory[bmiHistory.length - 2] : null;
 
   // Custom Trend Line Plotter (SVG Generator)
   const renderTrendChart = (type: "weight" | "bmi") => {

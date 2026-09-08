@@ -14,8 +14,9 @@ const nextConfig = {
   },
   // three.js ships untranspiled ESM; keep transpile list explicit for stability.
   transpilePackages: ["three"],
+  // Lint gates the build — a rule violation should fail CI, not ship.
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion"],

@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
-  UserCheck, 
   Plus, 
   Edit2, 
   Trash2, 
@@ -15,6 +14,8 @@ import {
 } from "lucide-react";
 import { collection, getDocs, getDoc, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isListableMember } from "@/lib/admin";
+import type { UserRecord } from "@/types/firestore";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +69,7 @@ export default function AdminTrainersPage() {
     email: "",
   });
 
-  const loadTrainersData = async () => {
+  const loadTrainersData = useCallback(async () => {
     setLoading(true);
     try {
       let tempTrainers: GymTrainer[] = [];
@@ -86,9 +87,7 @@ export default function AdminTrainersPage() {
           const mSnap = await getDocs(collection(db, "users"));
           mSnap.forEach((doc) => {
             const data = doc.data();
-            const email = (data.email || "").toLowerCase();
-            const isUserAdmin = data.role === "admin" || email === "admin@royalfitness.com";
-            if (!isUserAdmin) {
+            if (isListableMember(data)) {
               tempMembers.push({
                 uid: doc.id,
                 fullName: data.fullName || "Member",
@@ -127,7 +126,7 @@ export default function AdminTrainersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   const loadLocalTrainersFallback = () => {
     const isBrowser = typeof window !== "undefined";
@@ -168,7 +167,7 @@ export default function AdminTrainersPage() {
 
   useEffect(() => {
     loadTrainersData();
-  }, []);
+  }, [loadTrainersData]);
 
   const openCreateModal = () => {
     setForm({
@@ -270,13 +269,13 @@ export default function AdminTrainersPage() {
   // Toggle Member Trainer assignment
   const handleToggleAssignment = async (memberUid: string, trainerId: string | undefined) => {
     try {
-      let profile: any = {};
+      let profile: Partial<UserRecord> = {};
       if (db) {
         const snap = await getDoc(doc(db, "users", memberUid));
-        profile = snap.exists() ? snap.data() : {};
+        profile = snap.exists() ? (snap.data() as UserRecord) : {};
       } else {
         const cached = localStorage.getItem(`rf_profile_${memberUid}`);
-        profile = cached ? JSON.parse(cached) : {};
+        profile = cached ? (JSON.parse(cached) as UserRecord) : {};
       }
 
       const updatedProfile = {

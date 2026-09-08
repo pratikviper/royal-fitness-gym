@@ -1,7 +1,14 @@
 # dependencies
+# This project uses Yarn (PnP). yarn.lock is the single source of truth —
+# don't commit package-lock.json alongside it, and don't commit the generated
+# PnP runtime: it points at .yarn/cache paths that aren't in the repo, so a
+# fresh clone can't use it. Run `yarn install` to regenerate.
 /node_modules
 /.pnp
 .pnp.js
+.pnp.cjs
+.pnp.loader.mjs
+package-lock.json
 
 # next.js
 /.next/
@@ -24,6 +31,15 @@ yarn-error.log*
 # local env files
 .env
 .env*.local
+
+# credentials — service account keys grant full project access and must never
+# be committed. Keep the key out of the repo entirely; load it into
+# FIREBASE_SERVICE_ACCOUNT in .env.local (or your host's secret store) instead.
+*-firebase-adminsdk-*.json
+*serviceAccount*.json
+*service-account*.json
+*.key
+*.p12
 
 # typescript
 *.tsbuildinfo

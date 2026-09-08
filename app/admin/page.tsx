@@ -16,13 +16,15 @@ import {
 } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { 
-  getProfileDetails, 
-  getMembershipDetails,
-  type UserProfileDetails,
-  type UserMembership
-} from "@/lib/profile-db";
-import { 
+import { isListableMember } from "@/lib/admin";
+import type {
+  UserRecord,
+  MembershipRecord,
+  PaymentRecord,
+  TrainerRecord,
+  AttendanceRecord,
+} from "@/types/firestore";
+import {
   MembershipGrowthChart, 
   RevenueChart, 
   PlanDistributionChart 
@@ -79,11 +81,11 @@ export default function AdminDashboardPage() {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
-        let members: any[] = [];
-        let memberships: Record<string, any> = {};
-        let payments: any[] = [];
-        let trainers: any[] = [];
-        let attendance: any[] = [];
+        let members: UserRecord[] = [];
+        let memberships: Record<string, MembershipRecord> = {};
+        let payments: PaymentRecord[] = [];
+        let trainers: TrainerRecord[] = [];
+        let attendance: AttendanceRecord[] = [];
 
         // --- 1. FIREBASE QUERIES ---
         if (db) {
@@ -91,9 +93,8 @@ export default function AdminDashboardPage() {
             // Fetch users (members only)
             const usersSnap = await getDocs(collection(db, "users"));
             usersSnap.forEach((doc) => {
-              const u = doc.data();
-              const isUserAdmin = u.role === "admin" || u.email?.toLowerCase() === "admin@royalfitness.com";
-              if (!isUserAdmin) {
+              const u = doc.data() as UserRecord;
+              if (isListableMember(u)) {
                 members.push(u);
               }
             });
@@ -101,25 +102,25 @@ export default function AdminDashboardPage() {
             // Fetch memberships
             const membershipsSnap = await getDocs(collection(db, "memberships"));
             membershipsSnap.forEach((doc) => {
-              memberships[doc.id] = doc.data();
+              memberships[doc.id] = doc.data() as MembershipRecord;
             });
 
             // Fetch payments
             const paymentsSnap = await getDocs(collection(db, "payments"));
             paymentsSnap.forEach((doc) => {
-              payments.push(doc.data());
+              payments.push(doc.data() as PaymentRecord);
             });
 
             // Fetch trainers
             const trainersSnap = await getDocs(collection(db, "trainers"));
             trainersSnap.forEach((doc) => {
-              trainers.push(doc.data());
+              trainers.push(doc.data() as TrainerRecord);
             });
 
             // Fetch attendance
             const attendanceSnap = await getDocs(collection(db, "attendance"));
             attendanceSnap.forEach((doc) => {
-              attendance.push(doc.data());
+              attendance.push(doc.data() as AttendanceRecord);
             });
           } catch (e) {
             console.warn("Firestore fetch error, falling back to local storage:", e);
@@ -174,7 +175,6 @@ export default function AdminDashboardPage() {
 
         // Revenue this month
         let monthlyRevenue = 0;
-        const currentMonthName = today.toLocaleString("default", { month: "short" });
 
         payments.forEach((p) => {
           if (p.status === "Paid" && p.date) {
@@ -303,21 +303,21 @@ export default function AdminDashboardPage() {
     const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
     const uids = JSON.parse(uidsJson) as string[];
     
-    const members: any[] = [];
-    const memberships: Record<string, any> = {};
+    const members: UserRecord[] = [];
+    const memberships: Record<string, MembershipRecord> = {};
 
     uids.forEach((uid) => {
       const p = localStorage.getItem(`rf_profile_${uid}`);
       if (p) {
         try {
-          members.push(JSON.parse(p));
+          members.push(JSON.parse(p) as UserRecord);
         } catch {}
       }
 
       const m = localStorage.getItem(`rf_membership_${uid}`);
       if (m) {
         try {
-          memberships[uid] = JSON.parse(m);
+          memberships[uid] = JSON.parse(m) as MembershipRecord;
         } catch {}
       }
     });

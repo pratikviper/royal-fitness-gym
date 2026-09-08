@@ -1,6 +1,7 @@
-import { doc, setDoc, writeBatch, collection } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { calculateBmi } from "./bmi";
+import type { UserProfileDetails, UserMembership } from "./profile-db";
 
 const isBrowser = typeof window !== "undefined";
 
@@ -10,11 +11,6 @@ const getPastDateStr = (daysAgo: number) => {
   return d.toISOString().split("T")[0];
 };
 
-const getFutureDateStr = (daysAhead: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + daysAhead);
-  return d.toISOString().split("T")[0];
-};
 
 // Seeding configuration
 export async function seedDatabase(adminUid: string): Promise<void> {
@@ -29,10 +25,10 @@ export async function seedDatabase(adminUid: string): Promise<void> {
   ];
 
   // 2. MOCK MEMBERS PROFILE DETAILS (Empty - only real users are added by signups/admin)
-  const mockMembersProfiles: Array<any> = [];
+  const mockMembersProfiles: UserProfileDetails[] = [];
 
   // 3. MOCK MEMBERSHIPS
-  const mockMemberships: Array<any> = [];
+  const mockMemberships: UserMembership[] = [];
 
   // 4. HISTORICAL BMI RECORDS (2 per member for trend logging)
   const mockBmiReports: Array<{ uid: string; weightKg: number; heightCm: number; calculatedAt: string; bmiScore: number; category: string }> = [];

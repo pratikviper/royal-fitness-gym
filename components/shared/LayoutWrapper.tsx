@@ -15,23 +15,19 @@ export default function LayoutWrapper({
 
   const isAdmin = pathname.startsWith("/admin");
 
+  // The admin section renders its own <main> inside its dashboard shell, so
+  // wrapping it again here would nest landmarks and produce invalid HTML.
+  if (isAdmin) {
+    return <>{children}</>;
+  }
+
   return (
     <>
-      {!isAdmin && (
-        <>
-          <ScrollProgressBar />
-          <Navbar />
-        </>
-      )}
-
+      <ScrollProgressBar />
+      <Navbar />
       <main>{children}</main>
-
-      {!isAdmin && (
-        <>
-          <Footer />
-          <WhatsAppButton />
-        </>
-      )}
+      <Footer />
+      <WhatsAppButton />
     </>
   );
 }

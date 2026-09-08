@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
   Calendar as CalendarIcon, 
   Check, 
@@ -14,11 +14,13 @@ import {
 } from "lucide-react";
 import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isListableMember } from "@/lib/admin";
+import type { UserRecord, AttendanceRecord as AttendanceLog } from "@/types/firestore";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/shared/avatar";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 
 interface AttendanceRecord {
   uid: string;
@@ -38,14 +40,14 @@ export default function AdminAttendancePage() {
   );
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [rawAttendanceLogs, setRawAttendanceLogs] = useState<any[]>([]);
+  const [rawAttendanceLogs, setRawAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [search, setSearch] = useState("");
 
-  const loadAttendanceData = async () => {
+  const loadAttendanceData = useCallback(async () => {
     setLoading(true);
     try {
-      let members: any[] = [];
-      let logs: any[] = [];
+      let members: UserRecord[] = [];
+      let logs: AttendanceLog[] = [];
 
       if (db) {
         try {
@@ -53,17 +55,15 @@ export default function AdminAttendancePage() {
           const usersSnap = await getDocs(collection(db, "users"));
           usersSnap.forEach((doc) => {
             const data = doc.data();
-            const email = (data.email || "").toLowerCase();
-            const isUserAdmin = data.role === "admin" || email === "admin@royalfitness.com";
-            if (!isUserAdmin) {
-              members.push({ uid: doc.id, ...data });
+            if (isListableMember(data)) {
+              members.push({ ...(data as UserRecord), uid: doc.id });
             }
           });
 
           // Fetch attendance logs
           const attSnap = await getDocs(collection(db, "attendance"));
           attSnap.forEach((doc) => {
-            logs.push(doc.data());
+            logs.push(doc.data() as AttendanceLog);
           });
         } catch (e) {
           console.warn("Firestore attendance error, using local fallback:", e);
@@ -94,7 +94,7 @@ export default function AdminAttendancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast, selectedDate]);
 
   const loadLocalAttendanceFallback = () => {
     const isBrowser = typeof window !== "undefined";
@@ -102,20 +102,20 @@ export default function AdminAttendancePage() {
 
     const uidsJson = localStorage.getItem("rf_member_uids") || "[]";
     const uids = JSON.parse(uidsJson) as string[];
-    const members: any[] = [];
+    const members: UserRecord[] = [];
 
     uids.forEach((uid) => {
       const cached = localStorage.getItem(`rf_profile_${uid}`);
-      if (cached) members.push(JSON.parse(cached));
+      if (cached) members.push(JSON.parse(cached) as UserRecord);
     });
 
-    const logs = JSON.parse(localStorage.getItem("rf_attendance") || "[]");
+    const logs = JSON.parse(localStorage.getItem("rf_attendance") || "[]") as AttendanceLog[];
     return { members, logs };
   };
 
   useEffect(() => {
     loadAttendanceData();
-  }, [selectedDate]);
+  }, [loadAttendanceData]);
 
   const handleMarkAttendance = async (uid: string, status: "Present" | "Absent") => {
     try {
@@ -129,7 +129,7 @@ export default function AdminAttendancePage() {
       } else {
         // LocalStorage write
         const cached = localStorage.getItem("rf_attendance") || "[]";
-        const logs = JSON.parse(cached) as any[];
+        const logs = JSON.parse(cached) as AttendanceLog[];
         
         // Remove existing log for this user & date
         const filteredLogs = logs.filter((l) => !(l.uid === uid && l.date === selectedDate));
@@ -174,7 +174,7 @@ export default function AdminAttendancePage() {
         }
       } else {
         const cached = localStorage.getItem("rf_attendance") || "[]";
-        let logs = JSON.parse(cached) as any[];
+        let logs = JSON.parse(cached) as AttendanceLog[];
         logs = logs.filter((l) => l.date !== selectedDate);
         attendance.forEach((m) => {
           logs.push({ uid: m.uid, date: selectedDate, status: "Present" });
@@ -249,7 +249,7 @@ export default function AdminAttendancePage() {
 
         <Card className="glass border-white/5 ring-hairline">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Today's Check-in Rate</span>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Today&apos;s Check-in Rate</span>
             <Percent className="size-4 text-royal-light" />
           </CardHeader>
           <CardContent>
