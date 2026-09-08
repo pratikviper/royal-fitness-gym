@@ -66,13 +66,22 @@ export async function POST(request: Request) {
 
   let uid: string;
   try {
+    // The phone number is deliberately NOT passed to createUser.
+    //
+    // A phone number given to Firebase Auth becomes a sign-in identifier, and
+    // those are globally unique — the second member registered on a number
+    // would be rejected with auth/phone-number-already-exists. Households share
+    // a number all the time (a parent enrolling children, a couple on one
+    // handset), so the number is stored on the Firestore profile instead, where
+    // no uniqueness constraint applies and any number of members may share it.
+    //
+    // Members created here sign in with their email and the password they set
+    // via the setup link. Phone-OTP sign-in remains one account per number,
+    // which is a Firebase invariant rather than a choice made here.
     const created = await adminAuth().createUser({
       email,
       password: tempPassword,
       displayName: fullName,
-      // Only include a phone number when one was supplied — Firebase rejects
-      // an empty string, and rejects any number already on another account.
-      ...(body.phoneNumber?.trim() ? { phoneNumber: body.phoneNumber.trim() } : {}),
     });
     uid = created.uid;
   } catch (e) {
@@ -81,18 +90,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "An account with this email already exists." },
         { status: 409 }
-      );
-    }
-    if (code === "auth/phone-number-already-exists") {
-      return NextResponse.json(
-        { error: "An account with this phone number already exists." },
-        { status: 409 }
-      );
-    }
-    if (code === "auth/invalid-phone-number") {
-      return NextResponse.json(
-        { error: "Phone number must be in international format, e.g. +919730091331." },
-        { status: 400 }
       );
     }
     console.error("[admin/members] createUser failed:", e);
