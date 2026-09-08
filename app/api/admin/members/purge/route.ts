@@ -34,24 +34,51 @@ export async function POST(request: Request) {
 
   const db = adminDb();
 
-  // Collect the members to remove — never an admin, never the caller.
+  // Firebase Auth is the authoritative list of accounts, NOT the `users`
+  // collection: an account whose profile document was never created (a failed
+  // signup, or a record removed by an older delete path) still has a working
+  // login while being invisible in Firestore. Enumerating documents alone
+  // silently skips exactly the accounts most in need of cleaning up.
+  const profiles = new Map<string, FirebaseFirestore.DocumentData>();
   const usersSnap = await db.collection("users").get();
-  const targets: string[] = [];
-  usersSnap.forEach((docSnap) => {
-    if (docSnap.id === auth.uid) return;
-    if (isAdminRecord(docSnap.data())) return;
-    targets.push(docSnap.id);
-  });
+  usersSnap.forEach((d) => profiles.set(d.id, d.data()));
 
-  if (targets.length === 0) {
+  const targets = new Set<string>();
+
+  // 1. Every Auth account that is not an admin and not the caller.
+  let pageToken: string | undefined;
+  do {
+    const page = await adminAuth().listUsers(1000, pageToken);
+    for (const user of page.users) {
+      if (user.uid === auth.uid) continue;
+      // Judge admin status on the profile when there is one, and on the email
+      // claim when there isn't — otherwise an admin missing a document, or the
+      // bootstrap address itself, would be swept up.
+      const profile = profiles.get(user.uid);
+      if (isAdminRecord({ email: user.email ?? null, role: profile?.role ?? null })) continue;
+      targets.add(user.uid);
+    }
+    pageToken = page.pageToken;
+  } while (pageToken);
+
+  // 2. Profile documents with no Auth account behind them — nothing to revoke,
+  //    but the records still need clearing.
+  for (const [uid, data] of profiles) {
+    if (uid === auth.uid) continue;
+    if (isAdminRecord(data)) continue;
+    targets.add(uid);
+  }
+
+  const targetIds = [...targets];
+  if (targetIds.length === 0) {
     return NextResponse.json({ deleted: 0, failed: [] });
   }
 
-  // 1. Revoke logins. deleteUsers handles up to 1000 uids per call and reports
+  // 3. Revoke logins. deleteUsers handles up to 1000 uids per call and reports
   //    per-uid failures instead of throwing for the whole set.
   const failed: string[] = [];
-  for (let i = 0; i < targets.length; i += 1000) {
-    const chunk = targets.slice(i, i + 1000);
+  for (let i = 0; i < targetIds.length; i += 1000) {
+    const chunk = targetIds.slice(i, i + 1000);
     try {
       const result = await adminAuth().deleteUsers(chunk);
       for (const err of result.errors) {
@@ -67,9 +94,9 @@ export async function POST(request: Request) {
     }
   }
 
-  const removable = targets.filter((uid) => !failed.includes(uid));
+  const removable = targetIds.filter((uid) => !failed.includes(uid));
 
-  // 2. Delete their records.
+  // 4. Delete their records.
   try {
     const refs = [];
     for (const uid of removable) {
